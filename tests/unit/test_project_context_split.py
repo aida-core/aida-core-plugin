@@ -143,8 +143,13 @@ class TestLoadProjectContext(unittest.TestCase):
             self.assertEqual(merged["vcs"]["type"], "git")
             self.assertEqual(merged["vcs"]["remote_url"], "u")
 
-    def test_legacy_single_file_returns_as_is(self):
-        """Existing projects with everything in .yml still work."""
+    def test_legacy_single_file_stamps_schema_version(self):
+        """Existing projects with everything in .yml still work.
+
+        After #39, the loader stamps `schema_version` on read so
+        callers always see a current-version dict. Original keys
+        (including the legacy `version` field) are preserved.
+        """
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             claude = root / ".claude"
@@ -154,7 +159,17 @@ class TestLoadProjectContext(unittest.TestCase):
                 yaml.dump(legacy), encoding="utf-8"
             )
             merged = load_project_context(root)
-            self.assertEqual(merged, legacy)
+            # Every original key is preserved.
+            for k, v in legacy.items():
+                self.assertEqual(merged[k], v)
+            # Plus schema_version stamped to current.
+            from utils.project_context import (
+                PROJECT_CONTEXT_SCHEMA_VERSION,
+            )
+            self.assertEqual(
+                merged["schema_version"],
+                PROJECT_CONTEXT_SCHEMA_VERSION,
+            )
 
     def test_no_files_returns_empty_dict(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -201,7 +216,18 @@ class TestWriteProjectContext(unittest.TestCase):
             original = _sample_merged()
             write_project_context(root, original)
             reloaded = load_project_context(root)
-            self.assertEqual(reloaded, original)
+            # All original keys round-trip; the loader additionally
+            # stamps schema_version (#39) so we compare keys-wise
+            # rather than requiring exact equality.
+            for k, v in original.items():
+                self.assertEqual(reloaded[k], v)
+            from utils.project_context import (
+                PROJECT_CONTEXT_SCHEMA_VERSION,
+            )
+            self.assertEqual(
+                reloaded["schema_version"],
+                PROJECT_CONTEXT_SCHEMA_VERSION,
+            )
 
     def test_legacy_to_split_migration_on_write(self):
         """A single-file legacy project is split on next write."""
@@ -264,6 +290,118 @@ class TestEnsureGitignoreEntry(unittest.TestCase):
             content = (root / ".gitignore").read_text()
             self.assertTrue(content.startswith("*.pyc\n"))
             self.assertIn(".claude/aida-project-context.local.yml", content)
+
+
+class TestSchemaVersioning(unittest.TestCase):
+    """Test the schema versioning + migration framework (#39)."""
+
+    def test_current_version_is_a_string(self):
+        from utils.project_context import (
+            PROJECT_CONTEXT_SCHEMA_VERSION,
+        )
+        self.assertIsInstance(PROJECT_CONTEXT_SCHEMA_VERSION, str)
+        # Loose semver shape so callers can string-compare.
+        parts = PROJECT_CONTEXT_SCHEMA_VERSION.split(".")
+        self.assertEqual(len(parts), 3)
+        for p in parts:
+            int(p)  # must parse as integer
+
+    def test_migrate_stamps_current_on_empty_legacy_dict(self):
+        """A config with no schema_version gets stamped to current."""
+        from utils.project_context import (
+            PROJECT_CONTEXT_SCHEMA_VERSION,
+            migrate_to_current,
+        )
+        out = migrate_to_current({"project_name": "demo"})
+        self.assertEqual(
+            out["schema_version"], PROJECT_CONTEXT_SCHEMA_VERSION
+        )
+        self.assertEqual(out["project_name"], "demo")
+
+    def test_migrate_preserves_existing_schema_version(self):
+        """A config already at the current version is unchanged."""
+        from utils.project_context import (
+            PROJECT_CONTEXT_SCHEMA_VERSION,
+            migrate_to_current,
+        )
+        data = {
+            "schema_version": PROJECT_CONTEXT_SCHEMA_VERSION,
+            "project_name": "x",
+        }
+        out = migrate_to_current(data)
+        self.assertEqual(out, data)
+
+    def test_migrate_warns_on_newer_schema(self):
+        """Reading a config from a future AIDA version logs a
+        warning but returns the dict as-is (best-effort
+        forward-compat)."""
+        import logging
+        from utils.project_context import migrate_to_current
+
+        future = {
+            "schema_version": "99.0.0",
+            "project_name": "x",
+            "future_only_field": "stuff",
+        }
+        with self.assertLogs(
+            "utils.project_context", level=logging.WARNING
+        ) as cm:
+            out = migrate_to_current(future)
+        # Original fields preserved
+        self.assertEqual(out["project_name"], "x")
+        self.assertEqual(out["future_only_field"], "stuff")
+        # Warning logged
+        self.assertTrue(
+            any("newer than" in m for m in cm.output)
+        )
+
+    def test_migrate_empty_dict_returns_empty(self):
+        """Empty config (no .yml files) skips migration cleanly."""
+        from utils.project_context import migrate_to_current
+        self.assertEqual(migrate_to_current({}), {})
+
+    def test_legacy_version_field_treated_as_one_dot_zero(self):
+        """Pre-#39 files stamped `version: <app-version>` are
+        treated as schema 1.0.0 (the shape is identical)."""
+        from utils.project_context import (
+            PROJECT_CONTEXT_SCHEMA_VERSION,
+            migrate_to_current,
+        )
+        legacy = {
+            "version": "0.7.0",  # was app version, not schema
+            "project_name": "demo",
+        }
+        out = migrate_to_current(legacy)
+        # schema_version stamped to current
+        self.assertEqual(
+            out["schema_version"], PROJECT_CONTEXT_SCHEMA_VERSION
+        )
+        # Original `version` field preserved (it's a legacy app
+        # version stamp, harmless to keep around)
+        self.assertEqual(out["version"], "0.7.0")
+        self.assertEqual(out["project_name"], "demo")
+
+    def test_write_reads_back_with_schema_version(self):
+        """end-to-end: write a config, read it back, schema_version
+        is present even if the source dict didn't have it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".claude").mkdir()
+            # Source dict has NO schema_version (typical for a
+            # caller that just built a fresh context)
+            source = {
+                "project_name": "demo",
+                "vcs": {"type": "git"},
+            }
+            write_project_context(root, source)
+            reloaded = load_project_context(root)
+            from utils.project_context import (
+                PROJECT_CONTEXT_SCHEMA_VERSION,
+            )
+            self.assertEqual(
+                reloaded["schema_version"],
+                PROJECT_CONTEXT_SCHEMA_VERSION,
+            )
 
 
 if __name__ == "__main__":

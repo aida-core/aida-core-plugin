@@ -412,9 +412,15 @@ def detect_project_info(project_root: Path) -> Dict[str, Any]:
         >>> print(info["vcs"]["type"])
         'git'
     """
-    # Project metadata
+    # Project metadata. Note (#39): `schema_version` is the
+    # project-context schema version (independent of the AIDA app
+    # version). Bumping AIDA_VERSION does NOT bump this — only
+    # actual schema changes do, with a registered migration to keep
+    # older configs readable.
+    from utils.project_context import PROJECT_CONTEXT_SCHEMA_VERSION
+
     config = {
-        "version": AIDA_VERSION,
+        "schema_version": PROJECT_CONTEXT_SCHEMA_VERSION,
         "last_updated": datetime.now(timezone.utc).isoformat(),
         "config_complete": False,
 
