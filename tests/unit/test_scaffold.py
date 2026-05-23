@@ -3,6 +3,7 @@
 
 """Unit tests for plugin-manager scaffold.py main entry point."""
 
+import re
 import sys
 import tempfile
 import unittest
@@ -545,11 +546,22 @@ class TestScaffoldedLintBaseline(unittest.TestCase):
                 / "workflows"
                 / "ci.yml"
             ).read_text()
+            # Pinned to SHA per #53 hardening; the comment still
+            # carries the human-readable `v4`. Assert on the
+            # action name with its SHA-pin marker rather than the
+            # bare `@v4` form (which we deliberately moved away
+            # from to defend against compromised-tag attacks).
             self.assertIn(
-                "actions/setup-node@v4",
+                "actions/setup-node@",
                 ci,
                 "Python ci.yml missing setup-node step — `npx "
                 "markdownlint-cli` will fail without Node.",
+            )
+            self.assertIn(
+                "# v4",
+                ci,
+                "setup-node pin must carry a human-readable "
+                "version comment so reviewers can spot drift.",
             )
     """Test execute with agent stub."""
 
@@ -580,6 +592,104 @@ class TestScaffoldedLintBaseline(unittest.TestCase):
             self.assertTrue(
                 (target_path / "agents" / "my-agent" / "my-agent.md").exists()
             )
+
+
+class TestScaffoldedCiHardening(unittest.TestCase):
+    """Pin the CI security hardening pattern in scaffolded ci.yml (#53).
+
+    Downstream plugins should ship with the same hardening as aida-core
+    itself: least-privilege `permissions: contents: read`, SHA-pinned
+    Action references (with version comments), and a dependency audit
+    step. Otherwise every new plugin re-derives this from scratch (or
+    silently ships without it).
+    """
+
+    SHA_PATTERN = re.compile(
+        r"actions/(checkout|setup-python|setup-node)@[0-9a-f]{40}"
+    )
+
+    def _scaffold(self, language: str) -> Path:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / f"{language}-plugin")
+            context = {
+                "plugin_name": f"{language}-plugin",
+                "description": f"A {language} plugin for #53 part 3 hardening tests",
+                "license": "MIT",
+                "language": language,
+                "target_directory": target,
+                "author_name": "Test",
+                "author_email": "test@test.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            with patch.object(
+                _scaffold_mod, "initialize_git", return_value=True
+            ), patch.object(
+                _scaffold_mod,
+                "create_initial_commit",
+                return_value=True,
+            ):
+                result = execute(context)
+            self.assertTrue(
+                result["success"], result.get("message")
+            )
+            ci_path = (
+                Path(result["path"])
+                / ".github"
+                / "workflows"
+                / "ci.yml"
+            )
+            self.assertTrue(
+                ci_path.exists(),
+                f"{language} scaffold missing ci.yml",
+            )
+            # Read content before the temp dir is cleaned up.
+            return ci_path.read_text(encoding="utf-8")
+
+    def test_python_ci_has_workflow_permissions(self):
+        ci = self._scaffold("python")
+        self.assertIn("permissions:", ci)
+        self.assertIn("contents: read", ci)
+
+    def test_typescript_ci_has_workflow_permissions(self):
+        ci = self._scaffold("typescript")
+        self.assertIn("permissions:", ci)
+        self.assertIn("contents: read", ci)
+
+    def test_none_ci_has_workflow_permissions(self):
+        ci = self._scaffold("none")
+        self.assertIn("permissions:", ci)
+        self.assertIn("contents: read", ci)
+
+    def test_python_ci_pins_actions_to_sha(self):
+        """No bare `actions/<name>@v<n>` form — only SHA pins."""
+        ci = self._scaffold("python")
+        matches = self.SHA_PATTERN.findall(ci)
+        self.assertGreaterEqual(
+            len(matches),
+            3,
+            f"Expected at least 3 SHA-pinned actions; got "
+            f"{matches!r} from ci.yml",
+        )
+        # Defensive: no bare @v<digit> pattern survived.
+        for line in ci.splitlines():
+            if "uses:" in line and "actions/" in line:
+                self.assertNotRegex(
+                    line,
+                    r"actions/[a-z-]+@v\d+\s*$",
+                    f"Bare version pin (should be SHA): {line!r}",
+                )
+
+    def test_python_ci_includes_pip_audit(self):
+        """Python scaffold's CI runs pip-audit on the install tree."""
+        ci = self._scaffold("python")
+        self.assertIn("pip-audit", ci)
+        self.assertIn("--strict", ci)
+
+    def test_typescript_ci_includes_npm_audit(self):
+        """TypeScript scaffold's CI runs `npm audit`."""
+        ci = self._scaffold("typescript")
+        self.assertIn("npm audit", ci)
 
 
 class TestExecuteSkillsOnlyProject(unittest.TestCase):

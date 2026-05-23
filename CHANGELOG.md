@@ -13,6 +13,47 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.24] - 2026-05-23
+
+### Changed
+
+- **Scaffolded `ci.yml` templates ship the same CI hardening as
+  aida-core** (#53 part 3). Every newly scaffolded plugin's
+  `.github/workflows/ci.yml` now lands with:
+  - Top-level `permissions: contents: read`
+  - GitHub Action references pinned to commit SHAs with version
+    comments (`@<sha>  # v4`)
+  - A dependency audit step (`pip-audit --strict` for Python,
+    `npm audit --audit-level=high` for TypeScript)
+  - Python templates also `pip install --upgrade pip` before
+    audit so the bundled CVE-laden pip doesn't fail the gate
+  Applied across all three flavors: python, typescript, and
+  none (skills-only). Downstream plugins ship secure by
+  default instead of re-deriving this from scratch
+
+### Added
+
+- **`TestScaffoldedCiHardening`** (6 tests in
+  `tests/unit/test_scaffold.py`) — pins the hardening across
+  scaffolds:
+  - Each language flavor includes `permissions: contents: read`
+  - Pinned actions match `actions/<name>@<40-char-sha>`
+  - No bare `actions/<name>@v<n>` form survives
+  - Python scaffold includes `pip-audit --strict`
+  - TypeScript scaffold includes `npm audit`
+
+### Notes
+
+- This closes the "scaffold-output hardening" follow-up flagged in
+  1.5.23's PR (#53 part 2 only updated aida-core's own CI; part 3
+  brings the scaffolded templates along)
+- Existing
+  `TestScaffoldedLintBaseline.test_python_ci_yml_sets_up_node`
+  test updated to assert on the SHA-pinned form (`actions/setup-node@`
+  with a `# v4` comment) instead of the bare `@v4` form
+
+---
+
 ## [1.5.23] - 2026-05-23
 
 ### Changed
