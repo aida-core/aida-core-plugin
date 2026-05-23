@@ -186,6 +186,117 @@ class TestExecuteTypeScriptProject(unittest.TestCase):
             self.assertTrue((target_path / "vitest.config.ts").exists())
 
 
+class TestScaffoldedCiYamlParses(unittest.TestCase):
+    """Regression guard for #74: scaffolded ci.yml must be valid YAML.
+
+    The original bug used `{% raw %}…{% endraw %}` blocks to escape
+    GitHub Actions `${{ … }}` expressions. With Jinja2's
+    `trim_blocks=True`, `{% endraw %}` ate the trailing newline so
+    `name:` and `uses:` ended up concatenated on a single line,
+    producing a YAML parse error on the very first CI run of every
+    scaffolded plugin. Fix landed in 1.5.0 by switching to
+    `${{ '{{' }}…{{ '}}' }}` Jinja literals. This test pins the fix
+    so any future template change that reintroduces the same shape
+    fails loudly here instead of silently in user repos.
+    """
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_python_scaffold_ci_yml_parses(self, mock_commit, mock_git):
+        import yaml
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "py-plugin")
+            context = {
+                "plugin_name": "py-plugin",
+                "description": "A Python plugin for #74 regression testing",
+                "license": "MIT",
+                "language": "python",
+                "target_directory": target,
+                "author_name": "Test Author",
+                "author_email": "test@example.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertTrue(result["success"], result.get("message"))
+
+            ci_yml = (
+                Path(result["path"]) / ".github" / "workflows" / "ci.yml"
+            )
+            self.assertTrue(
+                ci_yml.exists(), f"ci.yml not generated at {ci_yml}"
+            )
+
+            # Must parse without raising — the original bug raised
+            # yaml.YAMLError on the mashed-together name/uses line.
+            content = ci_yml.read_text(encoding="utf-8")
+            parsed = yaml.safe_load(content)
+            self.assertIsInstance(parsed, dict)
+            self.assertEqual(parsed.get("name"), "CI")
+
+            # And specifically: the `name: Set up Python` step must
+            # have its own line, with `uses:` on the next line.
+            lines = content.splitlines()
+            for i, line in enumerate(lines):
+                if "Set up Python" in line and "name:" in line:
+                    self.assertNotIn(
+                        "uses:",
+                        line,
+                        f"`name:` and `uses:` mashed on line {i + 1}: {line!r}",
+                    )
+                    break
+            else:
+                self.fail(
+                    "Expected a 'Set up Python' step in scaffolded ci.yml"
+                )
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_typescript_scaffold_ci_yml_parses(self, mock_commit, mock_git):
+        import yaml
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "ts-plugin")
+            context = {
+                "plugin_name": "ts-plugin",
+                "description": "A TypeScript plugin for #74 regression testing",
+                "license": "MIT",
+                "language": "typescript",
+                "target_directory": target,
+                "author_name": "Test Author",
+                "author_email": "test@example.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertTrue(result["success"], result.get("message"))
+
+            ci_yml = (
+                Path(result["path"]) / ".github" / "workflows" / "ci.yml"
+            )
+            self.assertTrue(ci_yml.exists())
+
+            content = ci_yml.read_text(encoding="utf-8")
+            parsed = yaml.safe_load(content)
+            self.assertIsInstance(parsed, dict)
+            self.assertEqual(parsed.get("name"), "CI")
+
+            lines = content.splitlines()
+            for i, line in enumerate(lines):
+                if "Set up Node" in line and "name:" in line:
+                    self.assertNotIn(
+                        "uses:",
+                        line,
+                        f"`name:` and `uses:` mashed on line {i + 1}: {line!r}",
+                    )
+                    break
+            else:
+                self.fail(
+                    "Expected a 'Set up Node' step in scaffolded ci.yml"
+                )
+
+
 class TestExecuteWithAgentStub(unittest.TestCase):
     """Test execute with agent stub."""
 

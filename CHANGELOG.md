@@ -13,6 +13,29 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.5] - 2026-05-22
+
+### Added
+
+- `tests/unit/test_scaffold.py::TestScaffoldedCiYamlParses` —
+  regression test that scaffolds a full Python plugin and a full
+  TypeScript plugin, then asserts the generated
+  `.github/workflows/ci.yml` parses as YAML and that the
+  `Set up Python` / `Set up Node` step doesn't mash `name:` and
+  `uses:` onto a single line. Closes #74 (the underlying parse error
+  was fixed in 1.5.0 by switching the templates from
+  `{% raw %}…{% endraw %}` to Jinja-literal `${{ '{{' }}…{{ '}}' }}`,
+  but no test pinned the fix — so any future template change in the
+  same shape could silently reintroduce it).
+
+### Notes
+
+- No behavior change in this release; the underlying bug has been
+  fixed since 1.5.0
+- Milestone: `1.6.0 — Bug fixes`
+
+---
+
 ## [1.5.4] - 2026-05-22
 
 ### Fixed
