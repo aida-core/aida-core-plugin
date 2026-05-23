@@ -50,11 +50,21 @@ IGNORE_PATTERNS = [
     '.issues',
 ]
 
+# Individual filenames to skip. GitHub renders these directly into
+# its UI (PR description box, etc.); embedding YAML frontmatter
+# would show up verbatim in every PR description created from the
+# template, which is exactly the wrong thing.
+IGNORE_FILENAMES = frozenset({
+    "PULL_REQUEST_TEMPLATE.md",
+})
+
 
 def should_ignore(filepath: Path) -> bool:
     """Check if file should be ignored."""
     parts = filepath.parts
-    return any(pattern in parts for pattern in IGNORE_PATTERNS)
+    if any(pattern in parts for pattern in IGNORE_PATTERNS):
+        return True
+    return filepath.name in IGNORE_FILENAMES
 
 
 def extract_frontmatter(content: str) -> Optional[dict]:
