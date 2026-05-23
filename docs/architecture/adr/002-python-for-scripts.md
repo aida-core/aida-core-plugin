@@ -1,6 +1,7 @@
 ---
 type: adr
 title: "ADR-002: Python for Installation Scripts"
+description: "Python is the runtime for AIDA's installation, configuration, and skill-execution scripts."
 status: accepted
 date: "2025-11-01"
 deciders:

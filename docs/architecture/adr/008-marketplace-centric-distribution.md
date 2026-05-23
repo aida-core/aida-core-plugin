@@ -1,6 +1,7 @@
 ---
 type: adr
 title: "ADR-008: Marketplace-Centric Distribution"
+description: "Plugins are distributed through marketplace manifests; users add marketplaces, then install plugins from them."
 status: accepted
 date: "2025-01-21"
 deciders:

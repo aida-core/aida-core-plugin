@@ -1,6 +1,7 @@
 ---
 type: adr
 title: "ADR-009: Input Validation and Path Security"
+description: "All paths are validated via Path.resolve() and explicit checks to prevent directory traversal and symlink attacks."
 status: accepted
 date: "2026-02-16"
 deciders:

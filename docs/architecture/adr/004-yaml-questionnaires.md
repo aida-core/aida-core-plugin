@@ -1,6 +1,7 @@
 ---
 type: adr
 title: "ADR-004: YAML for Questionnaire Definitions"
+description: "YAML stores questionnaire definitions consumed by the two-phase API pattern (ADR-010)."
 status: accepted
 date: "2025-11-01"
 deciders:

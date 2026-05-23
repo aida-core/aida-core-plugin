@@ -1,6 +1,7 @@
 ---
 type: guide
 title: "Installation Guide"
+description: "How to install AIDA Core and add it to Claude Code."
 audience: users
 ---
 

@@ -1,6 +1,7 @@
 ---
 type: adr
 title: "ADR-001: Skills-First Architecture"
+description: "Skills (SKILL.md files combining process + execution) are the primary extension type; agents and knowledge layer on top."
 status: accepted
 date: "2025-11-01"
 deciders:

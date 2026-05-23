@@ -1,6 +1,7 @@
 ---
 type: adr
 title: "ADR-003: Jinja2 for Template Rendering"
+description: "Jinja2 is the template engine for scaffold and skill rendering across the plugin."
 status: accepted
 date: "2025-11-01"
 deciders:

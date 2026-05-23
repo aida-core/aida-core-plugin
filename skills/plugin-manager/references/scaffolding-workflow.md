@@ -1,6 +1,7 @@
 ---
 type: reference
 title: Plugin Scaffolding Workflow
+description: "Two-phase plugin scaffolding workflow — questions, execution, template variables, language-specific files, error handling, and the gitignore + lint + bootstrap-ordering policies."
 ---
 
 <!-- SPDX-FileCopyrightText: 2026 The AIDA Core Authors -->

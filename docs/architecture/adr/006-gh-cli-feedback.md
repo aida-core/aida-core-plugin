@@ -1,6 +1,7 @@
 ---
 type: adr
 title: "ADR-006: GitHub CLI for Feedback System"
+description: "The `gh` CLI is the transport for the /aida feedback, /aida bug, and /aida feature-request flows."
 status: accepted
 date: "2025-11-01"
 deciders:
