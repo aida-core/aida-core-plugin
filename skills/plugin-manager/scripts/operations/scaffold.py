@@ -41,6 +41,7 @@ from .scaffold_ops.licenses import (
 from .scaffold_ops.generators import (
     create_directory_structure,
     render_shared_files,
+    render_none_files,
     render_python_files,
     render_typescript_files,
     render_stub_agent,
@@ -149,12 +150,20 @@ def get_questions(
             }
         )
 
-    # Language
+    # Language. "none" is a skills-only / markdown-only flavor — no
+    # Python or TypeScript toolchain files. Explicit confirmation
+    # here so the scaffold doesn't silently default to Python for
+    # plugins that ship pure agents / skills / CLAUDE.md content
+    # (#96 — a markdown-only plugin previously got the full Python
+    # toolchain by default and had to manually rip it out).
     if not context.get("language"):
         questions.append(
             {
                 "id": "language",
-                "question": "Which language toolchain?",
+                "question": (
+                    "Which language toolchain? "
+                    "('none' = skills-only, no Python or TypeScript)"
+                ),
                 "type": "choice",
                 "options": list(SUPPORTED_LANGUAGES),
                 "default": "python",
@@ -409,9 +418,17 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
                     SCAFFOLD_TEMPLATES_DIR,
                 )
             )
-        else:
+        elif language == "typescript":
             all_files.extend(
                 render_typescript_files(
+                    target,
+                    variables,
+                    SCAFFOLD_TEMPLATES_DIR,
+                )
+            )
+        else:  # "none" — skills-only plugin
+            all_files.extend(
+                render_none_files(
                     target,
                     variables,
                     SCAFFOLD_TEMPLATES_DIR,
@@ -526,11 +543,19 @@ def _build_next_steps(
 
     if language == "python":
         steps.append('pip install -e ".[dev]"')
-    else:
+    elif language == "typescript":
         steps.append("npm install")
+    else:  # "none" — skills-only plugin
+        # No language deps to install; the lint tools (`reuse`,
+        # `markdownlint-cli`) come from the CI workflow's install
+        # step. For local dev, see CONTRIBUTING.md.
+        steps.append(
+            "# (skills-only: no language deps to install)"
+        )
 
     steps.append("make lint  # verify project structure")
-    steps.append("make test  # run initial tests")
+    if language != "none":
+        steps.append("make test  # run initial tests")
 
     if create_repo:
         steps.append(
