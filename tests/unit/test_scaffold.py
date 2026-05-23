@@ -417,6 +417,95 @@ class TestScaffoldedLintBaseline(unittest.TestCase):
 
     @patch.object(_scaffold_mod, "initialize_git", return_value=True)
     @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_python_pyproject_includes_reuse_dev_dep(
+        self, mock_commit, mock_git
+    ):
+        """Python pyproject.toml must ship `reuse` as a dev dep.
+
+        #100 follow-on: the scaffolded `Makefile` exposes a
+        `lint-reuse` target so the CONTRIBUTING docs can reference
+        it. For Python scaffolds, `reuse` should come in via
+        `pip install -e .[dev]` rather than requiring a separate
+        install step.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "py-plugin")
+            context = {
+                "plugin_name": "py-plugin",
+                "description": (
+                    "A Python plugin for #100 pyproject test"
+                ),
+                "license": "MIT",
+                "language": "python",
+                "target_directory": target,
+                "author_name": "Test",
+                "author_email": "test@test.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertTrue(result["success"], result.get("message"))
+
+            pyproject = (
+                Path(result["path"]) / "pyproject.toml"
+            ).read_text()
+            self.assertIn(
+                'reuse>=4.0',
+                pyproject,
+                "pyproject.toml missing reuse>=4.0 dev dep",
+            )
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_python_makefile_runs_lint_reuse(
+        self, mock_commit, mock_git
+    ):
+        """Python `lint:` aggregate must include `lint-reuse`.
+
+        The scaffolded CONTRIBUTING.md (and `make lint-reuse`
+        target) only delivers value if the project actually runs
+        the check. Python scaffolds get `reuse` via pip, so the
+        aggregate target wires it in.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "py-plugin")
+            context = {
+                "plugin_name": "py-plugin",
+                "description": "A Python plugin for #100 lint aggregate",
+                "license": "MIT",
+                "language": "python",
+                "target_directory": target,
+                "author_name": "Test",
+                "author_email": "test@test.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertTrue(result["success"], result.get("message"))
+
+            makefile = (
+                Path(result["path"]) / "Makefile"
+            ).read_text()
+            self.assertIn("lint-reuse:", makefile)
+            # The lint aggregate must depend on lint-reuse.
+            for line in makefile.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("lint:") and "##" in stripped:
+                    self.assertIn(
+                        "lint-reuse",
+                        stripped,
+                        f"Python `lint:` aggregate missing "
+                        f"`lint-reuse` dep: {stripped!r}",
+                    )
+                    break
+            else:
+                self.fail(
+                    "Did not find a `lint:` target with `## ` doc "
+                    "comment in scaffolded Makefile"
+                )
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
     def test_python_ci_yml_sets_up_node(self, mock_commit, mock_git):
         """Python scaffold ci.yml must install Node before make lint.
 

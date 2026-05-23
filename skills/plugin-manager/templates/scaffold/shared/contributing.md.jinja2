@@ -1,0 +1,109 @@
+{{ spdx_md }}
+
+# Contributing to {{ plugin_display_name }}
+
+Thanks for your interest in contributing. This document covers the
+project conventions that affect every contribution.
+
+## Adding new files
+
+Every hand-authored source file in this repository carries an SPDX
+license header so that license-inventory tools (FOSSA, Snyk, GitHub
+dep graph, [REUSE](https://reuse.software/), etc.) can attribute it
+automatically. When you add a new file, please add the corresponding
+header near the top — after any shebang line, after any YAML
+frontmatter block, but before any other content.
+
+<!-- REUSE-IgnoreStart -->
+**Markdown / HTML files:**
+
+```markdown
+<!-- SPDX-FileCopyrightText: {{ year }} {{ copyright_holder }} -->
+{% if license_id != "UNLICENSED" -%}
+<!-- SPDX-License-Identifier: {{ license_id }} -->
+{%- endif %}
+```
+
+**Python / shell / YAML / TOML (hash-style comments):**
+
+```text
+# SPDX-FileCopyrightText: {{ year }} {{ copyright_holder }}
+{% if license_id != "UNLICENSED" -%}
+# SPDX-License-Identifier: {{ license_id }}
+{%- endif %}
+```
+
+**TypeScript / JavaScript / C-family (slash-style comments):**
+
+```text
+// SPDX-FileCopyrightText: {{ year }} {{ copyright_holder }}
+{% if license_id != "UNLICENSED" -%}
+// SPDX-License-Identifier: {{ license_id }}
+{%- endif %}
+```
+<!-- REUSE-IgnoreEnd -->
+
+**Skip:** JSON files (no comment syntax), lockfiles, vendored or
+generated files, fixtures, and the `LICENSE`{% if license_id != "UNLICENSED" %} / `LICENSES/{{ license_id }}.txt`{% endif %} file{% if license_id != "UNLICENSED" %}s{% endif %} themselves.
+
+{% if license_id != "UNLICENSED" -%}
+## REUSE compliance
+
+This project follows the [REUSE Specification](https://reuse.software/spec/),
+which standardises copyright and licensing metadata across source
+files. Two artifacts at the repository root keep that machine-readable:
+
+- `LICENSES/{{ license_id }}.txt` — the canonical text of the
+  project's license. Add new license files here if the project ever
+  adopts a second license (e.g., a docs-only `CC0-1.0` alongside
+  the code license).
+- `REUSE.toml` — the skip-list for files that can't carry inline
+  headers (JSON, lockfiles, fixtures). Each entry attributes
+  copyright + license without modifying the file itself.
+
+### Verifying locally
+
+If your scaffold includes Python tooling, the project's `Makefile`
+exposes a `lint-reuse` target:
+
+```bash
+make lint-reuse
+```
+
+This runs `reuse lint` against the working tree and fails if any
+file is missing copyright information, missing a license identifier,
+or references a license that isn't in `LICENSES/`. CI runs the same
+check on every PR, so fixing locally before pushing saves a round
+trip.
+
+If you don't have `reuse` installed (pure Node.js / Markdown
+plugins), you can install it ad-hoc with `pip install reuse` or use
+the [fsfe/reuse-action](https://github.com/fsfe/reuse-action)
+GitHub Action in your CI.
+
+{% else -%}
+## License attribution
+
+This is a proprietary / unlicensed project — `SPDX-License-Identifier`
+lines are suppressed (UNLICENSED is not a valid SPDX identifier).
+We still record `SPDX-FileCopyrightText` so authorship is unambiguous
+across forks, moves, and external audits.
+
+{% endif -%}
+## Why this matters
+
+Clear, machine-readable attribution protects everyone's work:
+
+- **You** keep verifiable authorship of what you wrote
+- **The project** can answer "who wrote this and under what license"
+  without git-blame archaeology
+- **Downstream users** can run inventory tools (FOSSA / Snyk /
+  GitHub dep graph) and get clean reports
+{% if license_id != "UNLICENSED" -%}
+- **License audits** stay simple — the file headers, `LICENSES/`,
+  and `REUSE.toml` together describe the legal posture without
+  ambiguity
+{% endif %}
+If you have questions about how to apply these conventions to a
+specific contribution, open a draft PR and tag a maintainer — much
+easier to advise on a concrete file than in the abstract.

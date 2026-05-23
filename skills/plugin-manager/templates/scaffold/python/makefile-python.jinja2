@@ -5,7 +5,7 @@
 lint-py: ## Run ruff linter on Python files
 	ruff check .
 
-lint: lint-py lint-md lint-yaml lint-frontmatter ## Run all linters
+lint: lint-py lint-md lint-yaml lint-frontmatter lint-reuse ## Run all linters
 
 test: ## Run pytest
 	pytest tests/ -v

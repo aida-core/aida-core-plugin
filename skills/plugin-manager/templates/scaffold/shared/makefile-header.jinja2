@@ -5,7 +5,7 @@
 PLUGIN_PATH := $(shell pwd)
 PLUGIN_NAME := {{ plugin_name }}
 
-.PHONY: help lint lint-md lint-fix-md lint-yaml lint-frontmatter clean
+.PHONY: help lint lint-md lint-fix-md lint-yaml lint-frontmatter lint-reuse clean
 
 help: ## Show this help message
 	@echo "{{ plugin_display_name }} - Available targets:"
@@ -33,3 +33,12 @@ lint-yaml: ## Run yamllint on YAML files
 
 lint-frontmatter: ## Validate frontmatter in Markdown files
 	@echo "Frontmatter validation not yet configured"
+
+# REUSE / SPDX compliance: every hand-authored file should carry an
+# SPDX copyright header (and a license identifier if the project is
+# not UNLICENSED). `reuse` is a Python tool — Python scaffolds get
+# it through `pip install -e ".[dev]"`. TypeScript scaffolds can
+# install it ad-hoc with `pip install reuse` or use the
+# fsfe/reuse-action GitHub Action.
+lint-reuse: ## Verify REUSE / SPDX compliance
+	reuse lint

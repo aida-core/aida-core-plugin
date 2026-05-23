@@ -13,6 +13,55 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.9] - 2026-05-22
+
+### Added
+
+- **Scaffolded `CONTRIBUTING.md`** — every newly-scaffolded plugin
+  now ships a `CONTRIBUTING.md` that documents the SPDX/REUSE
+  convention for downstream plugin authors. The template adapts to
+  the plugin's `license_id`:
+  - For real SPDX licenses (MIT / MPL-2.0 / Apache-2.0 / …): includes
+    a "REUSE compliance" section explaining `LICENSES/<id>.txt`,
+    `REUSE.toml`, and `make lint-reuse`
+  - For UNLICENSED: skips the REUSE section, explains why
+    `SPDX-License-Identifier` lines are suppressed, but still covers
+    the `SPDX-FileCopyrightText` convention so authorship stays
+    unambiguous
+- Header examples for the three styles a contributor needs
+  (Markdown, hash-style, slash-style) — wrapped in
+  `<!-- REUSE-IgnoreStart --> / <!-- REUSE-IgnoreEnd -->` so the
+  example blocks don't trip `reuse lint` in downstream CI
+- **`lint-reuse` Makefile target** in the shared makefile header,
+  running `reuse lint`. Python scaffold's `lint:` aggregate now
+  depends on `lint-reuse`; TypeScript scaffolds leave it as an
+  opt-in target (REUSE is a Python tool — the CONTRIBUTING doc
+  points TS authors at `fsfe/reuse-action` for CI)
+- **`reuse>=4.0`** in Python scaffold's `pyproject.toml` dev
+  dependencies — `pip install -e .[dev]` now brings in the CLI so
+  `make lint-reuse` works without a separate install
+- Regression tests in `tests/unit/test_scaffold_generators.py` and
+  `tests/unit/test_scaffold.py`:
+  - `test_contributing_md_documents_spdx_convention` — pins the
+    required content for non-UNLICENSED scaffolds
+  - `test_contributing_md_omits_reuse_for_unlicensed` — pins the
+    proprietary-friendly variant
+  - `test_python_pyproject_includes_reuse_dev_dep` — pins the dev
+    dep
+  - `test_python_makefile_runs_lint_reuse` — pins the aggregate
+    target dep
+
+### Notes
+
+- End-to-end verified: a freshly-scaffolded MIT plugin is REUSE 3.3
+  compliant out of the box (16/16 files, including the new
+  `CONTRIBUTING.md`)
+- Closes the last checkbox from #73's umbrella ("Plugin scaffolding
+  documents the convention for plugin authors") — fixes #100
+- Milestone: `Scaffold v2 — usable out of the box`
+
+---
+
 ## [1.5.8] - 2026-05-22
 
 ### Fixed
