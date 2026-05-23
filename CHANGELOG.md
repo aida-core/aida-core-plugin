@@ -13,6 +13,43 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.7] - 2026-05-22
+
+### Added
+
+- **Gitignore policy documentation** — new "Gitignore Policy" section
+  in `skills/plugin-manager/references/scaffolding-workflow.md`
+  describing the slim-fragment composition (shared + per-language),
+  the forbidden patterns list, the 50-line size budget, and the
+  background that motivates it (#91)
+- **Slimness regression tests** in
+  `tests/unit/test_scaffold_generators.py::TestAssembleGitignore`:
+  - `test_gitignore_avoids_broad_file_name_blanket_patterns` —
+    asserts the assembled `.gitignore` does not contain `lib/`,
+    `*secrets*`, `*credentials*`, `*.key`, `*.pem`, or `*.env*` (the
+    specific patterns that caused the reporter's 11-file data loss
+    in the original #91 incident)
+  - `test_gitignore_stays_slim` — caps any language's assembled
+    `.gitignore` at 50 lines. If a language needs more, add a new
+    fragment rather than expanding an existing one
+
+### Notes
+
+- Audit finding: the AIDA plugin scaffold already met #91's literal
+  criteria — `assemble_gitignore` composes slim shared +
+  per-language fragments, and the fragments don't contain the broad
+  name-based wildcards the issue called out. The reporter's
+  incident came from a separate monorepo's universal `.gitignore`,
+  not AIDA scaffold output. This release pins the slim design with
+  tests and docs so future contributions can't drift toward the
+  kitchen-sink shape that caused the original failure
+- Adding new flavors beyond `python` / `typescript` (e.g., `cdk`,
+  `dbt`, `metabase`, `docs-only`) is out of scope for AIDA's plugin
+  scaffold and would belong in a broader scaffolding tool
+- Closes the **1.6.0 — Bug fixes** milestone (9/9 issues resolved)
+
+---
+
 ## [1.5.6] - 2026-05-22
 
 ### Added

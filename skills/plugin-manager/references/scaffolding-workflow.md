@@ -68,6 +68,54 @@ All templates receive these variables:
 - Makefile targets: `lint-ts`, `test` (vitest), `build` (tsc), `format` (prettier)
 - `.gitignore` includes `node_modules/`, `dist/`, `coverage/`
 
+## Gitignore Policy
+
+The scaffolded `.gitignore` is composed from **slim, flavor-specific
+fragments**, not a universal kitchen-sink template. The intent is to
+ignore noise without silently swallowing legitimate files.
+
+### Fragment composition
+
+`assemble_gitignore(target, language, …)` concatenates two fragments:
+
+| Fragment | Path | Scope |
+| --- | --- | --- |
+| Shared | `shared/gitignore-shared.jinja2` | OS files, IDE/editor scratch, `.claude/settings.local.json` |
+| Language | `<lang>/gitignore-<lang>.jinja2` | Patterns specific to the toolchain (Python venv, Node `dist/`, etc.) |
+
+Each fragment is intentionally small — typically 10–16 patterns. New
+patterns should be **bounded** (directory suffix `/`, file extension
+`.<ext>`, anchored path), not name-based wildcards.
+
+### Forbidden patterns
+
+The following are banned by `test_gitignore_avoids_broad_file_name_blanket_patterns`:
+
+| Pattern | Why it's banned |
+| --- | --- |
+| `lib/` | Swallows AWS CDK / Node `lib/` directories that contain real code |
+| `*secrets*` | Matches legitimate filenames like `SecretsStack.ts` (manages secrets, doesn't contain them) |
+| `*credentials*` | Matches legitimate filenames like `CredentialsStack.ts` |
+| `*.key` | Would swallow JWT / crypto sample fixtures in tests |
+| `*.pem` | Would swallow PEM fixtures in tests |
+| `*.env*` | Would swallow `.env.example` / `.env.sample` which are committable |
+
+### Size budget
+
+The assembled `.gitignore` for any single language must stay under 50
+lines (enforced by `test_gitignore_stays_slim`). If a language needs
+more patterns than the budget allows, **add a new flavor fragment**
+rather than appending to an existing one — that's the slim-fragment
+design.
+
+### Background
+
+This policy exists because a kitchen-sink universal `.gitignore`
+silently dropped 11 files from a CDK repo migration (see #91). The
+fragments are small, predictable, and auditable: anything that lands
+in `.gitignore` should be traceable to a specific fragment and
+rationale.
+
 ## Error Handling
 
 | Error | Cause | Resolution |

@@ -307,6 +307,94 @@ class TestAssembleGitignore(unittest.TestCase):
                         f"that would shadow shared project config",
                     )
 
+    def test_gitignore_avoids_broad_file_name_blanket_patterns(self):
+        """Regression: gitignore must not contain broad blanket
+        patterns that match by file *name* rather than location.
+
+        #91 background: the reporter scaffolded 9 repos using a
+        kitchen-sink monorepo `.gitignore` and silently lost 11 files
+        because patterns like `*secrets*`, `*credentials*`, and `lib/`
+        matched legitimate code:
+
+            - `lib/` swallowed an AWS CDK stack directory
+            - `*secrets*` swallowed `SecretsStack.ts` (which *manages*
+              secrets — it doesn't *contain* any)
+            - `*credentials*` swallowed similar `*CredentialsStack.ts`
+
+        AIDA's plugin scaffold already meets the slim-fragment design
+        the issue asks for (shared + per-language fragments, ~10-16
+        patterns each, no name-based blanket blocks). This test pins
+        that policy so future contributions can't drift toward the
+        kitchen-sink shape.
+        """
+        forbidden = {
+            "lib/": "matches CDK / Node lib directories",
+            "*secrets*": (
+                "matches legitimate filenames like SecretsStack.ts"
+            ),
+            "*credentials*": (
+                "matches legitimate filenames like CredentialsStack.ts"
+            ),
+            "*.key": "would swallow JWT / crypto sample fixtures",
+            "*.pem": "would swallow PEM fixtures in tests",
+            # `*.env*` would also match `.env.example` / `.env.sample`
+            # which teams typically want to commit.
+            "*.env*": "would swallow .env.example / .env.sample",
+        }
+
+        for lang in ("python", "typescript"):
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assemble_gitignore(target, lang, TEMPLATES_DIR)
+                lines = [
+                    line.strip()
+                    for line in (target / ".gitignore")
+                    .read_text()
+                    .splitlines()
+                ]
+                for pattern, reason in forbidden.items():
+                    self.assertNotIn(
+                        pattern,
+                        lines,
+                        f"{lang} gitignore contains forbidden broad "
+                        f"pattern {pattern!r} — {reason}",
+                    )
+
+    def test_gitignore_stays_slim(self):
+        """Regression: the assembled gitignore must stay slim.
+
+        #91 motivation was a kitchen-sink universal gitignore that
+        silently swallowed legitimate files. AIDA's design is small,
+        flavor-specific fragments; that property is observable as a
+        line-count budget. The current python and typescript outputs
+        are ~30 lines each (including section comments and blank
+        lines). The budget below leaves slack for one or two more
+        narrow patterns per language without re-opening the door to
+        the kitchen-sink failure mode.
+
+        If you find yourself raising this budget, prefer adding a new
+        per-flavor fragment (see scaffolding-workflow.md > Gitignore
+        Policy) over appending more patterns to an existing one.
+        """
+        MAX_LINES = 50
+
+        for lang in ("python", "typescript"):
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assemble_gitignore(target, lang, TEMPLATES_DIR)
+                line_count = len(
+                    (target / ".gitignore")
+                    .read_text()
+                    .splitlines()
+                )
+                self.assertLessEqual(
+                    line_count,
+                    MAX_LINES,
+                    f"{lang} gitignore is {line_count} lines, exceeds "
+                    f"slim budget of {MAX_LINES}. Either trim, or "
+                    f"split into a new per-flavor fragment.",
+                )
+
 
 class TestAssembleMakefile(unittest.TestCase):
     """Test Makefile assembly."""
