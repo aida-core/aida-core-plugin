@@ -83,6 +83,13 @@ from .plugins import (
     generate_plugin_preference_questions,
 )
 
+# Plugin dependency management (#20)
+from .dependencies import (
+    check_dependencies,
+    parse_version_spec,
+    version_satisfies,
+)
+
 # Agent discovery
 from .agents import (
     discover_agents,
@@ -172,6 +179,10 @@ __all__ = [
     "validate_plugin_config",
     "generate_plugin_checklist",
     "generate_plugin_preference_questions",
+    # Plugin dependency management (#20)
+    "check_dependencies",
+    "parse_version_spec",
+    "version_satisfies",
     # Agent discovery
     "discover_agents",
     "generate_agent_routing_section",

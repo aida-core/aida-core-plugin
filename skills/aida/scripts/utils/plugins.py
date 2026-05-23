@@ -209,6 +209,21 @@ def discover_installed_plugins() -> list[dict]:
                 plugin_dir_path, resolved_root
             )
 
+            # Surface dependencies declared in aida-config.json
+            # (#20). Treated as an optional plain dict; downstream
+            # callers use `utils.dependencies.check_dependencies()`
+            # to resolve specs against installed plugins.
+            dependencies_raw = (
+                aida_config.get("dependencies", {})
+                if aida_config
+                else {}
+            )
+            dependencies = (
+                dependencies_raw
+                if isinstance(dependencies_raw, dict)
+                else {}
+            )
+
             plugins.append(
                 {
                     "name": data.get("name", "unknown"),
@@ -218,6 +233,7 @@ def discover_installed_plugins() -> list[dict]:
                         if aida_config
                         else {}
                     ),
+                    "dependencies": dependencies,
                     "recommendedPermissions": (
                         aida_config.get(
                             "recommendedPermissions", {}
