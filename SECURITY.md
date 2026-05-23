@@ -34,7 +34,7 @@ disclosure.
 ### Alternative: Email
 
 If you can't use Security Advisories, send an email to
-**github@oakensoul.com** with the subject line
+<github@oakensoul.com> with the subject line
 `[SECURITY] aida-core — <brief description>`.
 
 ### What to Include
