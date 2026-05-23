@@ -255,6 +255,31 @@ For `expert` commands:
 /aida expert panel remove review   → expert-registry skill
 ```
 
+### Knowledge Sync Commands
+
+For `knowledge` commands:
+
+- **Invoke the `knowledge-sync` skill** to handle these operations
+- Reads `agents/<agent>/knowledge/sources.yml` declarations
+- Updates marker-delimited sections in agent knowledge files
+- Phase 1: local-file sources only (web / command / api are deferred)
+
+**Process:**
+
+1. Parse the command to extract:
+   - Operation: `sync` or `status`
+   - Argument: agent name
+
+2. Invoke `knowledge-sync` skill with the parsed context. Script:
+   `~/.aida/venv/bin/python3 {base_directory}/../knowledge-sync/scripts/sync.py --agent <name> [--dry-run]`
+
+**Examples:**
+
+```text
+/aida knowledge sync <agent>          → knowledge-sync skill (sync.py)
+/aida knowledge status <agent>        → knowledge-sync skill (--dry-run)
+```
+
 ### Memento Commands
 
 For `memento` commands:
@@ -373,6 +398,10 @@ When displaying help (for `help` command or no arguments), show:
 - `/aida expert panel list` - Show named panel compositions
 - `/aida expert panel create <name>` - Create a named expert panel
 - `/aida expert panel remove <name>` - Remove a named panel
+
+### Knowledge Sync
+- `/aida knowledge sync <agent>` - Sync an agent's knowledge from declared upstream sources
+- `/aida knowledge status <agent>` - Dry-run; report what would change
 
 ### Session Persistence
 - `/aida memento create "description"` - Save current work context

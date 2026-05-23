@@ -20,6 +20,15 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 The AIDA Core Authors"
 SPDX-License-Identifier = "MPL-2.0"
 
+# Python bytecode caches. Gitignored, ephemeral, no comment syntax.
+# `reuse lint` walks the working tree (not just tracked files) so
+# we annotate to keep the report clean during local dev / test runs.
+[[annotations]]
+path = ["**/__pycache__/**", "**/*.pyc"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The AIDA Core Authors"
+SPDX-License-Identifier = "MPL-2.0"
+
 # Scaffolding templates. These are hand-authored MPL-2.0 source files,
 # but their content is rendered into downstream artifacts; the
 # scaffolding tools inject per-file headers into the rendered output
