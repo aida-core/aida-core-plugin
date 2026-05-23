@@ -8,6 +8,7 @@ version checking, path resolution, file operations, and error handling.
 """
 
 import sys
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -597,6 +598,100 @@ class TestConfigureQuestionOptions(unittest.TestCase):
                 f"  {path} :: {qid}: {n} options ({opts})"
                 for path, qid, n, opts in offenders
             ),
+        )
+
+
+class TestDetectProjectType(unittest.TestCase):
+    """Test detect_project_type's language-family fallback (#86).
+
+    Previously, projects without a recognizable framework signature
+    returned None (which then surfaced as 'Unknown' in the auto-
+    generated SKILL.md). The fallback now detects the language
+    ecosystem from canonical manifest files and returns a useful
+    string (or a `+`-joined combination for multi-language repos).
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.root = Path(self.tmp)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_typescript_only(self):
+        """package.json + tsconfig.json -> Node/TypeScript."""
+        from utils import detect_project_type
+        (self.root / "package.json").write_text('{"name": "x"}')
+        (self.root / "tsconfig.json").write_text("{}")
+        self.assertEqual(
+            detect_project_type(self.root), "Node/TypeScript"
+        )
+
+    def test_javascript_only(self):
+        """package.json without tsconfig -> Node/JavaScript."""
+        from utils import detect_project_type
+        (self.root / "package.json").write_text('{"name": "x"}')
+        self.assertEqual(
+            detect_project_type(self.root), "Node/JavaScript"
+        )
+
+    def test_python_modern(self):
+        """pyproject.toml -> Python (no double-counting with
+        requirements.txt)."""
+        from utils import detect_project_type
+        (self.root / "pyproject.toml").write_text(
+            "[project]\nname = 'x'\n"
+        )
+        (self.root / "requirements.txt").write_text("flask\n")
+        # pyproject takes precedence; only one 'Python' entry.
+        self.assertEqual(detect_project_type(self.root), "Python")
+
+    def test_rust(self):
+        from utils import detect_project_type
+        (self.root / "Cargo.toml").write_text(
+            "[package]\nname = 'x'\n"
+        )
+        self.assertEqual(detect_project_type(self.root), "Rust")
+
+    def test_go(self):
+        from utils import detect_project_type
+        (self.root / "go.mod").write_text("module x\n")
+        self.assertEqual(detect_project_type(self.root), "Go")
+
+    def test_multi_language_python_and_typescript(self):
+        """The repro case from #86: TS + Python + workflows.
+
+        Returns a `+`-joined sorted list rather than 'Unknown'.
+        """
+        from utils import detect_project_type
+        (self.root / "package.json").write_text('{"name": "x"}')
+        (self.root / "tsconfig.json").write_text("{}")
+        (self.root / "requirements.txt").write_text(
+            "flask\n"
+        )
+        (self.root / ".github" / "workflows").mkdir(parents=True)
+        result = detect_project_type(self.root)
+        # Sorted alphabetically for determinism.
+        self.assertEqual(result, "Node/TypeScript + Python")
+
+    def test_returns_none_for_empty_project(self):
+        """Empty directory still returns None (not a string)."""
+        from utils import detect_project_type
+        self.assertIsNone(detect_project_type(self.root))
+
+    def test_framework_detection_still_wins(self):
+        """If a known framework signature matches, it still beats
+        the language-family fallback (no regression).
+        """
+        from utils import detect_project_type
+        (self.root / "package.json").write_text(
+            '{"name": "x", "dependencies": {"react": "^18"}}'
+        )
+        (self.root / "tsconfig.json").write_text("{}")
+        # React framework is more specific than Node/TypeScript.
+        self.assertEqual(
+            detect_project_type(self.root),
+            "Web application (frontend)",
         )
 
 
@@ -1346,6 +1441,7 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestFiles))
     suite.addTests(loader.loadTestsFromTestCase(TestAidaYmlRenderers))
     suite.addTests(loader.loadTestsFromTestCase(TestConfigureQuestionOptions))
+    suite.addTests(loader.loadTestsFromTestCase(TestDetectProjectType))
     suite.addTests(loader.loadTestsFromTestCase(TestQuestionnaire))
     suite.addTests(loader.loadTestsFromTestCase(TestTemplateRendering))
     suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
