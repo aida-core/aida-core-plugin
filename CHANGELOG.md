@@ -13,6 +13,42 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] - 2026-05-22
+
+### Fixed
+
+- `configure.py` `render_aida_project_marker` previously hardcoded
+  `plugins = ["aida-workflow-commands"]`, planting a dead reference
+  in every generated `.claude/aida.yml` — `aida-workflow-commands`
+  isn't a real plugin. The default is now an empty list; projects
+  add entries via `/aida config` or by editing the file. Fixes #83
+- `configure.py` `get_questions` defined two choice questions with
+  more options than `AskUserQuestion` accepts (cap is 4 plus the
+  always-supplied "Other"): `branching_model` had 6 options,
+  `issue_tracking` had 5. Both are trimmed to 4 mutually-exclusive
+  named choices; the reserved "Custom workflow" / "No specific
+  model" / unsupported-tracker cases fall through to the built-in
+  "Other". Help text updated to point users at "Other" for those
+  edge cases. Fixes #85
+
+### Added
+
+- `tests/unit/test_utils.py::TestConfigureQuestionOptions` — scans
+  `configure.py` and asserts every choice question has ≤ 4 options.
+  Guards against the #85 family regressing when new questions are
+  added (since AskUserQuestion's option-cap isn't enforced at
+  question-definition time)
+- `test_render_aida_project_marker_omits_dead_plugin_reference` —
+  regression guard for #83
+
+### Notes
+
+- The reporter on #85 only mentioned `branching_model`; the same
+  latent bug was present on `issue_tracking` and is included
+- Milestone: `1.6.0 — Bug fixes`
+
+---
+
 ## [1.5.3] - 2026-05-22
 
 ### Fixed

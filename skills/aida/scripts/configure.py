@@ -44,7 +44,7 @@ import logging
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict, List
 
 import _paths  # noqa: F401
 
@@ -169,8 +169,12 @@ def render_aida_project_marker(preferences: Dict[str, Any], project_name: str) -
     """
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    # Extract relevant preferences for the marker file
-    plugins = ["aida-workflow-commands"]
+    # Plugins enabled for this project. Starts empty — projects add
+    # entries via /aida config (plugins selection) or by editing the
+    # file directly. Previously hardcoded to "aida-workflow-commands",
+    # which doesn't exist as a plugin and produced a dead reference
+    # in every generated aida.yml (#83).
+    plugins: List[str] = []
 
     # Build configuration section from preferences
     config = {}
@@ -601,38 +605,50 @@ def get_questions(context: Dict[str, Any]) -> Dict[str, Any]:
     preferences = project_config.get("preferences", {})
     questions = []
 
-    # Branching model (ask if null and using git)
+    # Branching model (ask if null and using git).
+    # Capped at 4 mutually-exclusive named models — AskUserQuestion
+    # caps at 4 options and supplies its own "Other" automatically,
+    # which covers "Custom workflow" and "No specific model" (#85).
     if preferences.get("branching_model") is None and project_config["vcs"]["type"] == "git":
         questions.append({
             "id": "branching_model",
             "question": "What branching model does this project follow?",
             "type": "choice",
             "required": True,
-            "help": "AIDA will suggest branch names and merge strategies based on this model",
+            "help": (
+                "AIDA suggests branch names and merge strategies "
+                "based on this model. Pick 'Other' if your project "
+                "uses a custom workflow or no specific model."
+            ),
             "options": [
                 "GitHub Flow (feature branches → main)",
                 "Git Flow (main, develop, feature, release, hotfix)",
                 "GitLab Flow (feature branches → main → environments)",
                 "Trunk-based (commit directly to main, short-lived branches)",
-                "Custom workflow",
-                "No specific model"
             ]
         })
 
-    # Issue tracking (ask if null, but already defaulted to GitHub Issues if GitHub)
+    # Issue tracking (ask if null, but already defaulted to GitHub
+    # Issues if GitHub). Capped at 4 — AskUserQuestion adds its own
+    # "Other" so users on Linear, Asana, etc. can type it in. The
+    # explicit "Other (not supported …)" entry was redundant with
+    # that built-in (#85).
     if preferences.get("issue_tracking") is None:
         questions.append({
             "id": "issue_tracking",
             "question": "What issue tracking system does this project use?",
             "type": "choice",
             "required": True,
-            "help": "AIDA provides native MCP integration for GitHub and JIRA/Atlassian",
+            "help": (
+                "AIDA provides native MCP integration for GitHub and "
+                "JIRA/Atlassian. Pick 'Other' for anything else and "
+                "note the system in your project conventions."
+            ),
             "options": [
                 "GitHub Issues",
                 "GitHub Projects (project board)",
                 "JIRA/Atlassian",
                 "None - informal tracking only",
-                "Other (not supported - specify in conventions)"
             ]
         })
 
