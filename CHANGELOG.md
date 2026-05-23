@@ -13,6 +13,46 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.23] - 2026-05-23
+
+### Changed
+
+- **CI security hardening** (#53 part 2):
+  - Both workflows (`ci.yml`, `version-check.yml`) now declare
+    top-level `permissions: contents: read` for least-privilege.
+    Individual jobs escalate explicitly if they need more (none
+    do today)
+  - GitHub Action references **pinned to commit SHAs** with
+    version comments (`@<sha>  # v4`). A compromised tag can't
+    ship malicious code through us. Dependabot's
+    `github-actions` ecosystem entry (added in 1.5.20) keeps the
+    pins fresh — when an action releases a new version,
+    dependabot opens a PR with the new SHA and updated comment
+  - Pinned actions: `actions/checkout@v4`,
+    `actions/setup-python@v5`, `actions/setup-node@v4`
+
+### Added
+
+- **`pip-audit` step in the `lint` job** (#53 part 2). Runs after
+  `make install` so it audits the actual pinned dependency tree
+  (not just `requirements*.txt` in isolation), gates on `--strict`
+  so any known CVE in our dev or runtime deps fails CI. Auditing
+  in the lint job rather than a separate one avoids re-installing
+  deps for a security-only job
+
+### Notes
+
+- Closes 3 more items from #53's hardening checklist:
+  `permissions: contents: read`, pin actions to SHA, add pip-audit
+- The **scaffolded** `ci.yml` templates (for new plugins) are not
+  updated in this PR — they're a separate template surface and
+  warrant their own follow-up (scaffold output should hold the
+  same hardening pattern so downstream plugins ship secure by
+  default)
+- No code change beyond CI; no test changes needed
+
+---
+
 ## [1.5.22] - 2026-05-23
 
 ### Added
