@@ -21,6 +21,19 @@ tags:
 
 # Expert Registry
 
+> ⚠ **Deprecated in aida-core (1.x): moving to a dedicated
+> `aida-expert-plugin`.** This skill is an orchestration layer
+> (panel composition + activation policy) on top of agents,
+> which doesn't fit aida-core's scope of extension primitives.
+> See [ADR-012](../../docs/architecture/adr/012-split-expert-registry.md)
+> for the rationale and migration plan. The skill keeps working
+> in 1.x — only the *future home* is changing. At 2.0.0 it will
+> be removed from aida-core; install `aida-expert-plugin` from
+> the marketplace to keep `/aida expert ...` working.
+>
+> No action needed today. Watch the release notes for the
+> migration steps when the new plugin is published.
+
 Manages expert agent activation and named panel composition.
 Experts are regular agents whose frontmatter declares
 `role: expert` (plus an optional `expert-role` sub-role).

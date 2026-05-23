@@ -13,6 +13,42 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.21] - 2026-05-23
+
+### Added
+
+- **ADR-012**: split expert-registry into a dedicated
+  `aida-expert-plugin`. Architecture decision record at
+  `docs/architecture/adr/012-split-expert-registry.md`. Rationale:
+  the expert-registry is an *orchestration layer* (panel
+  composition + activation policy + mandatory experts) sitting on
+  top of agents — distinct from the other seven management skills
+  in aida-core, which are *extension primitives* (CRUD on agents
+  / skills / plugins / CLAUDE.md / hooks / mementos / permissions).
+  Splitting it keeps aida-core focused on primitives; opinionated
+  workflow plugins live in their own repos. Migration is phased:
+  this release files the ADR, a follow-up release adds the
+  deprecation notice (already in place — see below), the carve-out
+  happens when the new repo is ready, and full removal lands at
+  2.0.0 with a migration guide
+- **Deprecation notice** at the top of
+  `skills/expert-registry/SKILL.md` linking to ADR-012. The skill
+  keeps working in 1.x — only the *future home* is changing
+
+### Notes
+
+- Pairs with the #94 close (out-of-scope monorepo migration) as
+  part of the same scope-discipline pass — aida-core is for
+  Claude Code plugin foundation work, not orchestration opinions
+  or repo-lifecycle tooling
+- #60 (default panels + mandatory experts) is the first feature
+  that will land in `aida-expert-plugin` once it exists.
+  Commented on the issue to record the architecture decision
+- No code change beyond docs in this release; the actual repo
+  carve-out is a separate task once the new repo is created
+
+---
+
 ## [1.5.20] - 2026-05-23
 
 ### Added
