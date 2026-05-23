@@ -40,6 +40,7 @@ from typing import Any
 import _paths  # noqa: F401
 
 from shared.utils import safe_json_load  # noqa: E402
+from operations import deps  # noqa: E402
 from operations import extensions  # noqa: E402
 from operations import scaffold  # noqa: E402
 from operations import update  # noqa: E402
@@ -77,6 +78,18 @@ def is_update_operation(context: dict[str, Any]) -> bool:
     return context.get("operation") == "update"
 
 
+def is_deps_operation(context: dict[str, Any]) -> bool:
+    """Determine if this is a deps operation (#20).
+
+    Args:
+        context: Operation context
+
+    Returns:
+        True if the operation is deps
+    """
+    return context.get("operation") == "deps"
+
+
 def get_questions(
     context: dict[str, Any],
 ) -> dict[str, Any]:
@@ -93,6 +106,9 @@ def get_questions(
 
     if is_update_operation(context):
         return update.get_questions(context)
+
+    if is_deps_operation(context):
+        return deps.get_questions(context)
 
     # Force type to plugin for extension operations
     context["type"] = "plugin"
@@ -120,6 +136,9 @@ def execute(
 
     if is_update_operation(context):
         return update.execute(context, responses)
+
+    if is_deps_operation(context):
+        return deps.execute(context, responses)
 
     # Force type to plugin for extension operations
     context["type"] = "plugin"

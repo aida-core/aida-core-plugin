@@ -36,6 +36,7 @@ This skill activates when:
 - User invokes `/aida plugin list`
 - User invokes `/aida plugin scaffold`
 - User invokes `/aida plugin update`
+- User invokes `/aida plugin deps`
 - Routed from `aida` skill for any plugin operation
 
 ## Operations
@@ -48,6 +49,7 @@ This skill activates when:
 | `list`     | Extension   | List discovered plugins                    |
 | `scaffold` | Scaffolding | Scaffold a full new plugin project         |
 | `update`   | Migration   | Scan and patch plugin to current standards |
+| `deps`     | Inspection  | Report a plugin's declared deps + status   |
 
 ## Path Resolution
 

@@ -14,6 +14,20 @@ Example:
     >>> render_skill_directory(template_dir, output_dir, variables)
 """
 
+# Cross-package path setup must run before any `from shared.*` import.
+# The dep-management helpers (#20) live in `scripts/shared/` so they
+# can be reused by plugin-manager too — adding `scripts/` to sys.path
+# here lets `from shared.dependencies import ...` resolve in the
+# re-export block below without forcing each caller to do the setup.
+import sys as _sys
+from pathlib import Path as _Path
+
+_SHARED_ROOT = (
+    _Path(__file__).parent.parent.parent.parent.parent / "scripts"
+)
+if str(_SHARED_ROOT) not in _sys.path:
+    _sys.path.insert(0, str(_SHARED_ROOT))
+
 # Version checking
 from .version import (
     check_python_version,
@@ -83,8 +97,12 @@ from .plugins import (
     generate_plugin_preference_questions,
 )
 
-# Plugin dependency management (#20)
-from .dependencies import (
+# Plugin dependency management (#20). Pure helpers live in
+# scripts/shared/dependencies.py so plugin-manager (which has its
+# own `utils` namespace) can import them without cross-skill
+# acrobatics. Re-exported here so existing `from utils import ...`
+# call sites still resolve.
+from shared.dependencies import (
     check_dependencies,
     parse_version_spec,
     version_satisfies,
