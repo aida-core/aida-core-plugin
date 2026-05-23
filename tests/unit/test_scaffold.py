@@ -22,6 +22,12 @@ for _mod_name in list(sys.modules):
 sys.modules.pop("_paths", None)
 
 from operations import scaffold as _scaffold_mod  # noqa: E402
+# Also pull in update so the snapshot below captures the
+# plugin-manager-bound copy. scaffold.execute()'s upgrade-routing
+# path (#110) lazy-imports operations.update; without this, a
+# different skill's test running first could leave a stale `_paths`
+# cached so update's `_paths.SCAFFOLD_TEMPLATES_DIR` lookup fails.
+from operations import update as _update_mod  # noqa: E402,F401
 
 get_questions = _scaffold_mod.get_questions
 execute = _scaffold_mod.execute
@@ -748,6 +754,165 @@ class TestExecuteWithSkillStub(unittest.TestCase):
 # REUSE-IgnoreStart — this class asserts on literal SPDX-License-Identifier
 # strings inside test source; REUSE shouldn't try to parse those as real
 # expressions.
+class TestScaffoldDetectsExistingPlugin(unittest.TestCase):
+    """Test the existing-plugin detection + upgrade routing (#110).
+
+    Before this work, pointing `scaffold` at a directory that already
+    contained an AIDA plugin failed with "Target directory is not
+    empty" — a confusing dead-end that didn't acknowledge the plugin
+    was already there. Now scaffold detects the existing
+    `.claude-plugin/plugin.json`, surfaces a single confirmation
+    question, and routes to the standards-migration (update) flow on
+    approval. Behaviour for unrelated non-empty directories is
+    unchanged ("not empty" still surfaces).
+    """
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_metadata_is_written_on_scaffold(
+        self, mock_commit, mock_git
+    ):
+        """A successful scaffold writes aida-scaffold.json so a
+        future re-run can be precise about what was created.
+        """
+        import json as _json
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "demo")
+            context = {
+                "plugin_name": "demo",
+                "description": "Plugin for #110 metadata test",
+                "license": "MIT",
+                "language": "python",
+                "target_directory": target,
+                "author_name": "Test",
+                "author_email": "t@example.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertTrue(result["success"], result.get("message"))
+
+            meta_path = (
+                Path(result["path"])
+                / ".claude-plugin"
+                / "aida-scaffold.json"
+            )
+            self.assertTrue(
+                meta_path.exists(),
+                "aida-scaffold.json should be written on scaffold",
+            )
+            md = _json.loads(meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(md["language"], "python")
+            self.assertEqual(md["license_id"], "MIT")
+            self.assertEqual(md["plugin_name"], "demo")
+            self.assertIn("created_at", md)
+            self.assertIn("last_upgraded_at", md)
+            self.assertIn("generator_version", md)
+            self.assertEqual(md["schema_version"], 1)
+
+    def test_get_questions_detects_existing_plugin(self):
+        """When target_directory points at an existing plugin,
+        get_questions returns only the upgrade_existing question."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "existing"
+            (target / ".claude-plugin").mkdir(parents=True)
+            (target / ".claude-plugin" / "plugin.json").write_text(
+                '{"name": "existing", "version": "0.1.0"}\n'
+            )
+
+            result = _scaffold_mod.get_questions(
+                {"target_directory": str(target)}
+            )
+            question_ids = [q["id"] for q in result["questions"]]
+            self.assertEqual(question_ids, ["upgrade_existing"])
+            self.assertTrue(
+                result["inferred"].get("existing_plugin")
+            )
+            self.assertEqual(
+                result["inferred"].get("existing_plugin_path"),
+                str(target.resolve()),
+            )
+
+    def test_get_questions_ignores_non_plugin_non_empty(self):
+        """A non-empty directory without plugin.json is NOT treated
+        as an existing plugin — that path still falls through to the
+        normal scaffold questions (validate_target_directory will
+        reject it later with "directory not empty")."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "junk"
+            target.mkdir()
+            (target / "README.txt").write_text("unrelated\n")
+
+            result = _scaffold_mod.get_questions(
+                {"target_directory": str(target)}
+            )
+            # The existing-plugin short-circuit must NOT trigger;
+            # we get the normal full question set (plugin_name,
+            # description, license, language, …).
+            question_ids = {q["id"] for q in result["questions"]}
+            self.assertNotIn("upgrade_existing", question_ids)
+            self.assertFalse(
+                result.get("inferred", {}).get("existing_plugin")
+            )
+
+    def test_execute_declines_upgrade_returns_cancel(self):
+        """upgrade_existing='No, cancel' returns a clean cancel
+        message without touching the existing plugin."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "existing"
+            (target / ".claude-plugin").mkdir(parents=True)
+            (target / ".claude-plugin" / "plugin.json").write_text(
+                '{"name": "existing", "version": "0.1.0"}\n'
+            )
+
+            result = execute({
+                "target_directory": str(target),
+                "upgrade_existing": "No, cancel",
+            })
+            self.assertTrue(result["success"])
+            self.assertFalse(result["upgrade_routed"])
+            self.assertIn("Upgrade declined", result["message"])
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_execute_confirms_upgrade_routes_to_update(
+        self, mock_commit, mock_git
+    ):
+        """upgrade_existing='Yes, upgrade in place' calls update.execute.
+
+        We verify by scaffolding a plugin first (so metadata + files
+        exist) and then re-running scaffold with the upgrade flag.
+        The result should bear `upgrade_routed=True` and come from
+        the update operation, not the scaffold operation.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "demo")
+            initial_context = {
+                "plugin_name": "demo",
+                "description": (
+                    "Plugin for #110 upgrade-routing test"
+                ),
+                "license": "MIT",
+                "language": "python",
+                "target_directory": target,
+                "author_name": "Test",
+                "author_email": "t@example.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            initial = execute(initial_context)
+            self.assertTrue(
+                initial["success"], initial.get("message")
+            )
+
+            upgrade = execute({
+                "target_directory": target,
+                "upgrade_existing": "Yes, upgrade in place",
+            })
+            self.assertTrue(upgrade["success"])
+            self.assertTrue(upgrade["upgrade_routed"])
+
+
 class TestExecuteCustomLicense(unittest.TestCase):
     """Test execute with a custom (Other) SPDX license id.
 

@@ -12,6 +12,19 @@ from pathlib import Path
 from typing import Optional
 
 
+def is_existing_aida_plugin(target: Path) -> bool:
+    """Return True if ``target`` already contains an AIDA plugin.
+
+    A directory is an existing AIDA plugin when it contains
+    ``.claude-plugin/plugin.json``. The scaffold wizard treats those
+    differently from unrelated non-empty directories — instead of
+    failing with "directory not empty", it offers to upgrade the
+    plugin via the standards-migration flow (#110).
+    """
+    marker = target / ".claude-plugin" / "plugin.json"
+    return marker.exists() and marker.is_file()
+
+
 def infer_git_config() -> dict[str, str]:
     """Infer author name and email from git config.
 
@@ -93,6 +106,15 @@ def validate_target_directory(
                 f"{target}",
             )
         if any(target.iterdir()):
+            # An existing AIDA plugin gets handled separately
+            # (the wizard offers to upgrade it); this validator
+            # only signals "unrelated non-empty directory".
+            if is_existing_aida_plugin(target):
+                return (
+                    False,
+                    f"Target directory already contains an "
+                    f"AIDA plugin: {target}",
+                )
             return (
                 False,
                 f"Target directory is not empty: "

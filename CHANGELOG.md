@@ -13,6 +13,76 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.13] - 2026-05-23
+
+### Added
+
+- **Scaffold detects existing AIDA plugins and offers to upgrade.**
+  Previously, pointing `/aida plugin scaffold` at a directory that
+  already contained `.claude-plugin/plugin.json` failed with
+  "Target directory is not empty" — a confusing dead-end (#110).
+  Now `get_questions` short-circuits to a single confirmation
+  prompt:
+  - **Yes, upgrade in place** → routes to the standards-migration
+    (`update`) flow, returning its result with
+    `upgrade_routed: True` and `operation: "scaffold"` so the
+    orchestrator surfaces the right context
+  - **No, cancel** → returns a clean "Upgrade declined" message;
+    no files touched
+  Behaviour for unrelated non-empty directories is unchanged —
+  they still surface "Target directory is not empty"
+- **`.claude-plugin/aida-scaffold.json` metadata.** Every
+  successful scaffold writes a small metadata file recording what
+  was scaffolded: `schema_version`, `plugin_name`,
+  `generator_version` (read from this plugin's `plugin.json`),
+  `language`, `license_id`, `include_agent_stub`,
+  `include_skill_stub`, `created_at`, `last_upgraded_at`. This
+  pairs with the upgrade-routing flow so re-runs can be precise
+- **`is_existing_aida_plugin(target)`** helper in
+  `scaffold_ops/context.py` — single source of truth for the
+  "this is an AIDA plugin" check (presence of
+  `.claude-plugin/plugin.json`)
+- **`read_scaffold_metadata(target)`** in `scaffold.py` — reads
+  the new metadata file, returns `None` on missing/malformed
+  input so callers can fall back to inference
+
+### Changed
+
+- **`/aida plugin update` honors the recorded language** via
+  `.claude-plugin/aida-scaffold.json`. Previously
+  `_detect_language` inferred from file presence (`pyproject.toml`
+  → python, `package.json` → typescript, default python) and
+  couldn't distinguish a `language="none"` (skills-only) plugin
+  from a Python one. Now metadata wins; filesystem inference is
+  the fallback for plugins scaffolded before this metadata
+  existed. Closes the #96 reporter's "/aida plugin update
+  auto-inferred Python on a markdown-only plugin" experience
+  end-to-end
+- `_detect_language` now returns `"none"` as a valid value (was
+  `"python"` or `"typescript"` only). Invalid metadata values
+  (e.g., `"rust"`) fall back to inference rather than propagating
+
+### Notes
+
+- The recorded `generator_version` is read at scaffold time from
+  this plugin's own `.claude-plugin/plugin.json` — so it always
+  reflects the actual aida-core version that produced the
+  scaffold, not a hardcoded constant that can drift
+- The metadata file uses `schema_version: 1` so future shape
+  changes can be detected
+- End-to-end verified four-step flow: scaffold a plugin →
+  metadata written → scaffold again at same path → confirmation
+  question surfaces → user picks "No" → clean cancel; user picks
+  "Yes" → routes to update
+- New tests (8) split across `test_scaffold.py` (existing-plugin
+  detection + routing + metadata write) and `test_update_scanner.py`
+  (metadata-driven `_detect_language` with fallback for invalid /
+  malformed metadata)
+- Milestone: `Scaffold v2 — usable out of the box` (7/7 closed
+  after merge)
+
+---
+
 ## [1.5.12] - 2026-05-22
 
 ### Added

@@ -162,22 +162,45 @@ def _read_generator_version(plugin_path: Path) -> str:
 
 
 def _detect_language(plugin_path: Path) -> str:
-    """Detect the plugin language from filesystem markers.
+    """Detect the plugin language.
 
-    Checks for language-specific files in order of
-    specificity:
-    - pyproject.toml -> "python"
-    - package.json -> "typescript"
-    - scripts/ directory -> "python"
-    - src/ directory -> "typescript"
-    - default: "python"
+    Prefers ``.claude-plugin/aida-scaffold.json`` (#110) — that
+    records the exact language chosen at scaffold time, including
+    ``"none"`` for skills-only plugins. Falls back to filesystem
+    inference for plugins scaffolded before the metadata existed:
+
+    - ``pyproject.toml`` -> ``"python"``
+    - ``package.json`` -> ``"typescript"``
+    - ``scripts/`` directory -> ``"python"``
+    - ``src/`` directory -> ``"typescript"``
+    - default: ``"python"``
+
+    Note: filesystem inference cannot detect ``"none"`` (skills-only)
+    correctly — a markdown-only plugin would have been
+    misidentified as Python. The metadata path is what fixes the
+    #96 reporter's silent-Python-toolchain experience.
 
     Args:
         plugin_path: Absolute path to the plugin directory
 
     Returns:
-        "python" or "typescript"
+        ``"python"``, ``"typescript"``, or ``"none"``
     """
+    metadata_path = (
+        plugin_path / ".claude-plugin" / "aida-scaffold.json"
+    )
+    if metadata_path.exists():
+        try:
+            data = json.loads(
+                metadata_path.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            data = None
+        if isinstance(data, dict):
+            recorded = data.get("language")
+            if recorded in ("python", "typescript", "none"):
+                return recorded
+
     if (plugin_path / "pyproject.toml").exists():
         return "python"
     if (plugin_path / "package.json").exists():
