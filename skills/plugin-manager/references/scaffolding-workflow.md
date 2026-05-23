@@ -116,6 +116,74 @@ fragments are small, predictable, and auditable: anything that lands
 in `.gitignore` should be traceable to a specific fragment and
 rationale.
 
+## Lint Policy
+
+The scaffolded plugin ships with `markdownlint`, `yamllint`, and
+language-specific linters (`ruff` for Python, `eslint`/`prettier` for
+TypeScript). The defaults are pre-tuned so a fresh scaffold lands
+**green on first `make lint`** — see #82 and #92 for the failure
+modes that motivated each choice.
+
+### markdownlint defaults
+
+`.markdownlint.json` disables the rules that flag valid AIDA-skill
+prose (template placeholders, tight technical text, footer patterns).
+The full set:
+
+| Rule | Setting | Why |
+| --- | --- | --- |
+| `MD013` | line_length 120, off for headings/code/tables | Long, descriptive prose in skill/agent files |
+| `MD022` | false | Tight knowledge docs omit blanks around headings |
+| `MD024` | `siblings_only: true` | Same heading text under different parents is fine |
+| `MD025` | false | Conflicts with frontmatter `title:` plus `# Heading` |
+| `MD032` | false | Tight technical lists without surrounding blanks |
+| `MD033` | false | Skill stubs use `<PRD>`, `<ticket>`, `<figma-url>` placeholders |
+| `MD034` | false | Bare URLs in references are intentional |
+| `MD036` | false | `**Last updated:** …` footer is convention, not heading |
+| `MD040` | false | Plain output dumps without language tags |
+| `MD041` | false | First line is frontmatter, not H1 |
+| `MD046` | `style: fenced` | Consistent code-block style |
+
+If you add a rule back, add a comment in the JSON explaining what
+real content it caught — `default: true` plus a small disable list
+is intentional friction against re-enabling rules that flag
+non-problems.
+
+### yamllint defaults
+
+`.yamllint.yml` extends the default ruleset with:
+
+- `ignore:` block excluding `node_modules/`, `dist/`, `coverage/`,
+  `build/`, `__pycache__/`, `.venv/`, `venv/`, `.pytest_cache/`,
+  `.ruff_cache/`. Without this, `yamllint -c .yamllint.yml .` walks
+  third-party YAML in `node_modules/` and emits hundreds of failures
+  (#82 bug 2)
+- `line-length` raised to 120
+- `truthy` accepts the common explicit values; `check-keys: false`
+  so GitHub Actions `on:` (parses as truthy) doesn't trip the rule
+- `document-start: present: true` is **kept on** — AIDA's own
+  generators (#81/#97 fix in 1.5.3) always emit a `---` marker, so
+  consumers should expect one
+
+### markdownlint invocation
+
+The Makefile uses `npx --yes markdownlint-cli --config .markdownlint.json`:
+
+- `npx --yes` resolves to the version in `devDependencies` for
+  TypeScript scaffolds (no global install needed after
+  `npm install`); on Python scaffolds, `--yes` suppresses the
+  install prompt so CI doesn't hang on first run
+- `--config` is passed explicitly because markdownlint-cli's
+  auto-discovery can silently miss the config when invoked through
+  `npx` from a non-package-root working directory
+
+### Python scaffold CI
+
+Python plugin CI installs Node.js via `actions/setup-node@v4` even
+though there's no JavaScript in the project. This is so `make lint`
+(which calls `lint-md` → `npx markdownlint-cli`) works without a
+manual install step.
+
 ## Error Handling
 
 | Error | Cause | Resolution |

@@ -13,6 +13,66 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.8] - 2026-05-22
+
+### Fixed
+
+- **Scaffolded `lint-md` works on fresh installs** — Makefile now
+  invokes `npx --yes markdownlint-cli --config .markdownlint.json`
+  instead of bare `markdownlint`. TypeScript scaffolds get
+  `markdownlint-cli` in `devDependencies` so `npm install` brings
+  it in; Python scaffolds' CI now sets up Node via
+  `actions/setup-node@v4` so `npx` can resolve the tool. Previously
+  a fresh `make lint` on either flavor failed with
+  `markdownlint: No such file or directory`. Fixes #82 (bug 1)
+- **`yamllint` no longer scans vendored / generated directories** —
+  the scaffolded `.yamllint.yml` now has a top-level `ignore:`
+  block excluding `node_modules/`, `dist/`, `coverage/`, `build/`,
+  `__pycache__/`, `.venv/`, `venv/`, `.pytest_cache/`,
+  `.ruff_cache/`. Previously `yamllint -c .yamllint.yml .` walked
+  `node_modules/` and emitted hundreds of failures from
+  third-party YAML. Fixes #82 (bug 2)
+- **Markdownlint default rules tuned for AIDA prose** — the
+  scaffolded `.markdownlint.json` now disables rules that conflict
+  with valid skill / agent content: `MD022` (blanks around
+  headings), `MD032` (blanks around lists), `MD033` (inline HTML —
+  skill stubs use `<PRD>` / `<ticket>` placeholders), `MD034`
+  (bare URLs), `MD036` (`**Last updated:** …` footer pattern), and
+  `MD040` (fenced code language tags on plain output dumps).
+  Previously every scaffolded plugin failed lint on the very first
+  push from these rules firing on real prose. Fixes #82 (bug 3)
+  and #92
+
+### Added
+
+- **"Lint Policy" section** in
+  `skills/plugin-manager/references/scaffolding-workflow.md`
+  documenting the markdownlint rule table (with the *why* for each
+  disable), the yamllint config choices (including why
+  `document-start` stays on — the #81/#97 work in 1.5.3 makes our
+  generators emit `---`), and the Python-CI Node setup rationale
+- Regression tests in
+  `tests/unit/test_scaffold_generators.py::TestRenderSharedFiles`
+  and `tests/unit/test_scaffold.py::TestScaffoldedLintBaseline`
+  pinning all four fixes at the rendered-output level:
+  - yamllint config carries the required `ignore:` paths
+  - markdownlint config disables the required rules (`MD022`,
+    `MD025`, `MD032`, `MD033`, `MD034`, `MD036`, `MD040`, `MD041`)
+  - TypeScript `package.json` includes `markdownlint-cli` devDep
+  - Makefile uses `npx --yes markdownlint-cli` + explicit
+    `--config`, never bare `markdownlint`
+  - Python `ci.yml` includes `actions/setup-node@v4`
+
+### Notes
+
+- Verified end-to-end: scaffolded a Python plugin, added bogus YAML
+  inside a simulated `node_modules/`, ran `yamllint -c
+  .yamllint.yml .` — exit 0 (the ignore block successfully prunes
+  the noise)
+- Milestone: `Scaffold v2 — usable out of the box`
+
+---
+
 ## [1.5.7] - 2026-05-22
 
 ### Added

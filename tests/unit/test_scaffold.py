@@ -297,7 +297,165 @@ class TestScaffoldedCiYamlParses(unittest.TestCase):
                 )
 
 
-class TestExecuteWithAgentStub(unittest.TestCase):
+class TestScaffoldedLintBaseline(unittest.TestCase):
+    """Regression guards for #82 + #92: lint config that actually works.
+
+    The scaffold previously emitted three broken lint defaults:
+
+    - #82.1: `lint-md` called `markdownlint` directly while the
+      TypeScript package.json had no `markdownlint-cli` dependency,
+      so fresh installs hit `markdownlint: No such file or directory`
+    - #82.2: `lint-yaml` scanned `node_modules/`, producing hundreds
+      of failures from third-party YAML
+    - #82.3 / #92: markdownlint defaults conflicted with real
+      AIDA-generated prose (template placeholders → MD033, tight
+      technical content → MD022 / MD032, etc.)
+
+    Plus Python scaffolds had no Node.js setup in their CI workflow,
+    so `npx markdownlint-cli` would fail there too.
+
+    These tests pin all four fixes together at the scaffold-output
+    level — the rendered files have to be self-sufficient when a new
+    plugin gets `npm install` / `pip install -e .[dev]` and runs
+    `make lint`.
+    """
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_typescript_package_includes_markdownlint_cli(
+        self, mock_commit, mock_git
+    ):
+        """TS package.json must ship markdownlint-cli as a devDep."""
+        import json as _json
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "ts-plugin")
+            context = {
+                "plugin_name": "ts-plugin",
+                "description": (
+                    "A TypeScript plugin for #82 lint dep testing"
+                ),
+                "license": "MIT",
+                "language": "typescript",
+                "target_directory": target,
+                "author_name": "Test",
+                "author_email": "test@test.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertTrue(result["success"], result.get("message"))
+
+            pkg = _json.loads(
+                (Path(result["path"]) / "package.json").read_text()
+            )
+            dev_deps = pkg.get("devDependencies", {})
+            self.assertIn(
+                "markdownlint-cli",
+                dev_deps,
+                f"package.json missing markdownlint-cli devDep; "
+                f"got {sorted(dev_deps)}",
+            )
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_makefile_uses_npx_for_markdownlint(
+        self, mock_commit, mock_git
+    ):
+        """Makefile lint-md must use `npx --yes markdownlint-cli`.
+
+        Direct `markdownlint` invocation only works when the binary
+        is globally installed — broken on fresh TS scaffolds and on
+        Python scaffolds without an explicit global install. `npx
+        --yes` resolves to the devDep on TS, and prompt-suppresses
+        on first run elsewhere.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "py-plugin")
+            context = {
+                "plugin_name": "py-plugin",
+                "description": (
+                    "A Python plugin for #82 makefile testing"
+                ),
+                "license": "MIT",
+                "language": "python",
+                "target_directory": target,
+                "author_name": "Test",
+                "author_email": "test@test.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertTrue(result["success"], result.get("message"))
+
+            makefile = (
+                Path(result["path"]) / "Makefile"
+            ).read_text()
+
+            # lint-md and lint-fix-md must call npx markdownlint-cli
+            # with explicit --config so auto-discovery quirks don't
+            # silently drop our config.
+            for marker in (
+                "npx --yes markdownlint-cli",
+                "--config .markdownlint.json",
+            ):
+                self.assertIn(
+                    marker,
+                    makefile,
+                    f"Makefile missing required marker: {marker!r}",
+                )
+
+            # The old `markdownlint '**/*.md'` direct invocation
+            # without npx must not appear — it's the broken shape.
+            for line in makefile.splitlines():
+                stripped = line.lstrip()
+                self.assertFalse(
+                    stripped.startswith("markdownlint ")
+                    and "npx" not in stripped,
+                    f"Direct `markdownlint` call (no npx): {line!r}",
+                )
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_python_ci_yml_sets_up_node(self, mock_commit, mock_git):
+        """Python scaffold ci.yml must install Node before make lint.
+
+        `make lint` calls `lint-md`, which shells out to npx /
+        markdownlint-cli (a Node tool). Hosted Ubuntu runners have
+        Node pre-installed, but the workflow still needs an explicit
+        `actions/setup-node@v4` step so the version is pinned and
+        npm cache is set up.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "py-plugin")
+            context = {
+                "plugin_name": "py-plugin",
+                "description": (
+                    "A Python plugin for #82 ci-yml testing"
+                ),
+                "license": "MIT",
+                "language": "python",
+                "target_directory": target,
+                "author_name": "Test",
+                "author_email": "test@test.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertTrue(result["success"], result.get("message"))
+
+            ci = (
+                Path(result["path"])
+                / ".github"
+                / "workflows"
+                / "ci.yml"
+            ).read_text()
+            self.assertIn(
+                "actions/setup-node@v4",
+                ci,
+                "Python ci.yml missing setup-node step — `npx "
+                "markdownlint-cli` will fail without Node.",
+            )
     """Test execute with agent stub."""
 
     @patch.object(_scaffold_mod, "initialize_git", return_value=True)

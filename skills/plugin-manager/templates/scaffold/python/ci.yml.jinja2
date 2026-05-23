@@ -23,6 +23,14 @@ jobs:
         with:
           python-version: ${{ '{{' }} matrix.python-version {{ '}}' }}
 
+      # markdownlint-cli is a Node tool; `make lint-md` shells out to
+      # `npx --yes markdownlint-cli`. Hosted Ubuntu runners ship Node
+      # by default, so we only need setup-node to pin the version.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '{{ node_version }}'
+
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
