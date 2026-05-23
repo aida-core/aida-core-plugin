@@ -13,6 +13,31 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.14] - 2026-05-23
+
+### Added
+
+- **`docs/FRONTMATTER_SCHEMA.md`** documenting `.frontmatter-schema.json`
+  as a reusable contract for downstream plugins and marketplaces
+  (#88). Covers: the 10 supported `type` values and their
+  required fields, two consumption patterns (vendor + pin via
+  `curl`, or `$ref` the tagged raw URL), the type-enum expansion
+  policy (how to propose a new type vs add custom fields), and
+  the pain pattern that motivated the docs (a downstream wrote a
+  duplicate schema and spent ~2h discovering AIDA Core already
+  shipped the right one)
+- **README link** to the new docs page from the Reference section
+
+### Notes
+
+- The new docs page self-validates: its own frontmatter (`type:
+  reference`, `title`, `description`) passes the AIDA schema
+- Downstream consumers can pin against `v1.5.14` immediately;
+  earlier tagged URLs also work, just with the older type set
+- Milestone: `Config & Schema Quality`
+
+---
+
 ## [1.5.13] - 2026-05-23
 
 ### Added

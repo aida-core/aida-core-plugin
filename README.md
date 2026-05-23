@@ -108,6 +108,7 @@ For detailed walkthrough, see the [Getting Started Guide](docs/GETTING_STARTED.m
 
 - **[Examples](docs/EXAMPLES.md)** - Real-world usage scenarios
 - **[Extension Framework](docs/EXTENSION_FRAMEWORK.md)** - Architecture and design
+- **[Frontmatter Schema](docs/FRONTMATTER_SCHEMA.md)** - Reusable JSON Schema for downstream plugins / marketplaces
 
 ## Requirements
 
