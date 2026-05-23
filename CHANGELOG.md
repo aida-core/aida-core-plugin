@@ -13,6 +13,63 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.27] - 2026-05-23
+
+### Added
+
+- **`/aida plugin deps` command** (#20 part 2). Non-interactive,
+  CI-friendly dep-status report:
+  - Reads `dependencies` from the target plugin's
+    `.claude-plugin/aida-config.json` (defaults to cwd)
+  - Resolves each declared spec against installed plugins
+    discovered under `~/.claude/plugins/cache/`
+  - Returns a structured report: per-dep `name` / `required` /
+    `installed` / `status` (`satisfied` / `wrong-version` /
+    `missing`) plus a summary
+  - `success: False` when any dep is unsatisfied, so the command
+    is usable as a CI gate ("verify all deps satisfied before
+    publishing")
+- **`deps.py` operation** in `skills/plugin-manager/scripts/operations/`,
+  wired through `manage.py`'s dispatch alongside `scaffold` and
+  `update`. Two-phase API mirrors the other operations:
+  - `get_questions`: no questions, report up-front in `inferred`
+  - `execute`: same report, plus the pass/fail summary
+- **`/aida plugin deps` routing** in the aida dispatcher SKILL.md
+  (with example invocations for cwd-based and explicit-path forms)
+- 11 new tests in `tests/unit/test_plugin_deps.py`: declared-dep
+  reading (no config / no field / valid / non-string filtering /
+  malformed JSON / non-dict deps field), execute behavior (no
+  declared deps / all satisfied / missing / wrong-version), and
+  the get_questions phase shape
+
+### Changed
+
+- **`utils.dependencies` moved to `shared.dependencies`** (no
+  caller-visible change — `utils/__init__.py` re-exports the same
+  three names). The pure helpers belong in `scripts/shared/` so
+  plugin-manager (which has its own `utils` namespace via
+  `operations/utils.py`) can import them without cross-skill
+  acrobatics
+- **`utils/__init__.py` now adds `scripts/` to `sys.path`** at the
+  top of the module so the `shared.dependencies` re-export
+  resolves. A new `ruff.toml` allows `E402` in that specific file
+  since the path setup legitimately precedes the imports it
+  enables
+
+### Notes
+
+- This closes the **user-facing slice** of #20: declared deps are
+  now readable from a command. The still-deferred pieces are
+  agent-registry collation (`/aida agents list`) and automatic
+  install-time resolution (`/aida plugin install <name>`)
+- Tests live in two places by design: `test_dependencies.py`
+  covers the pure helpers; `test_plugin_deps.py` covers the
+  plugin-manager operation that uses them
+- 27 unreleased version bumps now on main (1.5.2 → 1.5.27);
+  cutting a release is the natural next step
+
+---
+
 ## [1.5.26] - 2026-05-23
 
 ### Added

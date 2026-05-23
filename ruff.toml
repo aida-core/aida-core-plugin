@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 The AIDA Core Authors
+# SPDX-License-Identifier: MPL-2.0
+
+# Ruff configuration. Keep this minimal — most behavior should
+# stay defaults so contributors don't have to learn project-specific
+# lint rules.
+
+line-length = 120
+
+[lint.per-file-ignores]
+# utils/__init__.py manipulates sys.path before importing `shared.*`
+# (see comment in the file). The path setup *has* to happen between
+# the docstring and the imports it enables.
+"skills/aida/scripts/utils/__init__.py" = ["E402"]

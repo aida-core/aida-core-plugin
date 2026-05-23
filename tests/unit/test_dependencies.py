@@ -10,11 +10,12 @@ import unittest
 from pathlib import Path
 
 _project_root = Path(__file__).parent.parent.parent
-sys.path.insert(
-    0, str(_project_root / "skills" / "aida" / "scripts")
-)
+# Dep helpers live in scripts/shared/dependencies.py (post-#20 move
+# from skills/aida/scripts/utils/dependencies.py so plugin-manager
+# can import them without cross-skill `utils` namespace collisions).
+sys.path.insert(0, str(_project_root / "scripts"))
 
-from utils.dependencies import (  # noqa: E402
+from shared.dependencies import (  # noqa: E402
     check_dependencies,
     parse_version_spec,
     version_satisfies,
