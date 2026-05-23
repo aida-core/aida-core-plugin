@@ -13,6 +13,32 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.20] - 2026-05-23
+
+### Added
+
+- **`MAINTAINERS.md`** at the repo root (ADR-0015, #90). Lists
+  the current active maintainer roster, distinct from the broader
+  contributor list in `AUTHORS`. Includes a "how to reach us"
+  section and a brief note on becoming a maintainer.
+- **`.github/dependabot.yml`** (ADR-0017, #90). Weekly updates
+  for both Python (`pip`) and `github-actions`, anchored to
+  Monday 09:00 America/New_York with a 5-PR-at-once cap and
+  `dependencies` / `python` / `github-actions` labels for easy
+  triage.
+
+### Notes
+
+- Closes the Splash marketplace compliance audit (ADR-0015 +
+  ADR-0017) — once this lands, the plugin can be removed from
+  the grandfather lists in `splash-ai-marketplace`'s validator
+- Pure repo-hygiene addition; no runtime behavior changes
+- Pairs naturally with #53 if/when that broader hardening
+  checklist gets picked up (`SECURITY.md`, `CONTRIBUTING.md`,
+  pre-commit, etc.)
+
+---
+
 ## [1.5.19] - 2026-05-23
 
 ### Added

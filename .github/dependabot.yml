@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 The AIDA Core Authors
+# SPDX-License-Identifier: MPL-2.0
+---
+# Dependabot configuration (#90, ADR-0017).
+# Keeps Python deps + GitHub Actions versions current with weekly PRs.
+version: 2
+
+updates:
+  # Python deps live in requirements*.txt at the repo root.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - python
+    commit-message:
+      prefix: chore
+      include: scope
+
+  # GitHub Actions versions in .github/workflows/*.yml.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: chore
+      include: scope
