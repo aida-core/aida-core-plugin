@@ -13,6 +13,48 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.28] - 2026-05-23
+
+### Added
+
+- **`/aida plugin agents` command** (#20 part 3) — cross-plugin
+  agent registry with collision detection. Walks the project's
+  `agents/`, the user's `~/.claude/agents/`, and every installed
+  plugin under `~/.claude/plugins/cache/`. Returns a unified
+  roster (each entry tagged with its source + source_label) plus
+  a list of name collisions across sources. `success: False`
+  when any collision is detected, so the command is usable as a
+  CI gate ("verify our plugin doesn't introduce an agent-name
+  conflict with anything we have installed")
+- **`operations/agents.py`** in plugin-manager — distinct from
+  `utils.discover_agents` (which dedupes by name — first-found
+  wins). This view preserves duplicates so collisions can be
+  flagged. Lightweight by design — handles malformed frontmatter
+  gracefully (falls back to filename), skips `agents/<name>/knowledge/`
+  files, skips symlinked plugin dirs
+- **`/aida plugin agents` routing** in the aida dispatcher SKILL.md;
+  `agents` row added to plugin-manager's Operations table
+- 15 new tests in `tests/unit/test_plugin_agents.py` cover discovery
+  across all three sources, malformed-frontmatter fallback, knowledge-
+  file skipping, the collision detector (cross-source + sorted
+  output), the execute summary (`success`, `by_source` breakdown,
+  collision count), and the get_questions phase shape
+
+### Notes
+
+- **Closes the user-facing scope of #20**. Three slices shipped:
+  - Foundation: dep helpers + scaffold field (1.5.26)
+  - `/aida plugin deps`: declared deps + status (1.5.27)
+  - `/aida plugin agents`: cross-plugin agent registry (this PR)
+  The remaining piece — automatic install-time resolution
+  (`/aida plugin install <name>`) — needs marketplace coordination
+  and stays out of scope here
+- Distinct command surface from `/aida agent list` (agent-manager
+  CRUD on a single agent definition). `/aida plugin agents` is
+  the cross-plugin roster view
+
+---
+
 ## [1.5.27] - 2026-05-23
 
 ### Added

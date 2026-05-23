@@ -50,6 +50,7 @@ This skill activates when:
 | `scaffold` | Scaffolding | Scaffold a full new plugin project         |
 | `update`   | Migration   | Scan and patch plugin to current standards |
 | `deps`     | Inspection  | Report a plugin's declared deps + status   |
+| `agents`   | Inspection  | Cross-plugin agent roster + collisions     |
 
 ## Path Resolution
 
