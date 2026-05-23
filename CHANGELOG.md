@@ -13,6 +13,64 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.19] - 2026-05-23
+
+### Added
+
+- **Project-context schema versioning + migration framework**
+  (#39). The project-context YAML now carries a `schema_version`
+  field (currently `1.0.0`), separate from the AIDA app version:
+  - `PROJECT_CONTEXT_SCHEMA_VERSION = "1.0.0"` constant in
+    `utils/project_context.py`. Bump major for breaking changes,
+    minor for additive fields, patch for clarifications
+  - `_MIGRATIONS` registry — `Dict[str, Callable]` mapping
+    from-version to a migrator function. Empty today (schema is
+    fresh at 1.0.0), but the framework is in place so future
+    schema bumps can register migrators and the loader walks
+    them in order
+  - `migrate_to_current(data)` — public entry point. At current
+    version: stamps `schema_version`. Older: walks migrations
+    forward. Newer: logs a warning and returns as-is (best-effort
+    forward compat). Missing migration in chain: warns and stops
+    rather than crashing
+  - `load_project_context()` now calls `migrate_to_current()`
+    automatically, so consumers always see a current-version
+    dict. The next `write_project_context()` persists the
+    upgrade
+
+### Changed
+
+- **Project context now stamps `schema_version`, not `version`**.
+  The previous `version: AIDA_VERSION` stamp conflated app
+  version with schema version (#39's core bug — docs said one
+  thing, code stamped another). New configs get
+  `schema_version: "1.0.0"`. Legacy files with a `version` field
+  are treated as schema 1.0.0 (the shape didn't actually
+  change), and the original `version` field is preserved
+  in-memory + on disk for backward compat
+- `validate.py`'s expected top-level keys now require
+  `schema_version` instead of `version`. Since
+  `load_project_context()` stamps `schema_version` on read, this
+  passes for all existing configs after one round-trip
+
+### Notes
+
+- This is foundational work — no immediate user-facing behavior
+  change. Sets up safe future schema evolution
+- 7 new tests in `tests/unit/test_project_context_split.py::TestSchemaVersioning`
+  cover the migration framework: stamping current, preserving
+  current, warning on newer, empty-dict skip, legacy-version
+  treatment, and the end-to-end write-then-read round-trip
+- Two existing tests
+  (`test_legacy_single_file_returns_as_is` renamed to
+  `test_legacy_single_file_stamps_schema_version`,
+  `test_round_trip_via_disk`) updated to assert the new
+  schema-stamping contract rather than strict equality
+- Closes **Config & Schema Quality** milestone (6/6)
+- Milestone: `Config & Schema Quality`
+
+---
+
 ## [1.5.18] - 2026-05-23
 
 ### Added

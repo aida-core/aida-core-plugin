@@ -48,7 +48,11 @@ import yaml  # noqa: E402
 # that they're present and well-shaped; specific value enums get
 # checked in the value-shape section.
 EXPECTED_TOP_LEVEL_KEYS = {
-    "version",
+    # `schema_version` (post-#39) is the project-context schema
+    # version, distinct from the AIDA app version. Legacy configs
+    # with `version` are migrated in-memory so this key is always
+    # present after `load_project_context()`.
+    "schema_version",
     "project_name",
     "vcs",
     "files",
