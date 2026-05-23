@@ -13,6 +13,50 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.22] - 2026-05-23
+
+### Added
+
+- **`SECURITY.md`** at the repo root — vulnerability disclosure
+  policy. Covers supported versions, two reporting channels
+  (GitHub Security Advisories preferred; email fallback),
+  required report contents, response timeline (acknowledge
+  within 72h, assess within 7d), and explicit scope (the
+  plugin + direct deps; not third-party plugins or Claude
+  Code itself)
+- **`CONTRIBUTING.md`** at the repo root — dev setup, repo
+  layout, workflow (branch → make lint → make test → version
+  bump + CHANGELOG → PR), code standards per language
+  (Python ruff + type hints, Markdown frontmatter + relaxed
+  markdownlint, YAML with explicit document-start + indented
+  sequences, REUSE/SPDX), conventional-commits, and the
+  **AI Tools and Attribution** policy. The attribution
+  section is the project's existing policy (no
+  `Co-Authored-By` trailers referencing AI tools — already
+  enforced by the `check-attribution` CI workflow)
+- **`CODE_OF_CONDUCT.md`** at the repo root — Contributor
+  Covenant 2.1 verbatim with AIDA Core SPDX frontmatter.
+  Reporting contact is `github@oakensoul.com` (matches
+  the maintainer contact in `MAINTAINERS.md`)
+
+### Notes
+
+- Closes 3 of the ~9 remaining items in #53's hardening
+  checklist: SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
+- All three files self-validate against the AIDA frontmatter
+  schema (type: documentation, with description)
+- Reference templates fetched from `oakensoul/loadout` per the
+  notes on #53 (CODE_OF_CONDUCT fetched verbatim to avoid
+  LLM content-filter issues; CONTRIBUTING + SECURITY adapted
+  to this repo's specifics — MPL-2.0 license, Python 3.9+
+  matrix, etc.)
+- Pure docs addition; no runtime behavior changes
+- Pairs with the earlier `MAINTAINERS.md` + `dependabot.yml`
+  (1.5.20) to bring the repo's governance docs to a
+  marketplace-standard baseline
+
+---
+
 ## [1.5.21] - 2026-05-23
 
 ### Added
