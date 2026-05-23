@@ -63,7 +63,8 @@
     "claude-md-manager",
     "memento",
     "permissions",
-    "expert-registry"
+    "expert-registry",
+    "knowledge-sync"
   ],
   "agents": ["aida", "claude-code-expert"]
 }

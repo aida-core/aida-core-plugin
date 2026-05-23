@@ -13,6 +13,52 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.29] - 2026-05-23
+
+### Added
+
+- **`knowledge-sync` skill** (#22) — opt-in syncing of marker-delimited
+  sections inside an agent's knowledge files from declared upstream
+  sources. Agents that want to pull from upstream declare it in
+  `agents/<agent>/knowledge/sources.yml`; the target knowledge file
+  wraps the synced region in
+  `<!-- upstream:start name="X" -->` / `<!-- upstream:end -->` markers.
+  Everything outside the markers (author intro, custom conclusion,
+  per-project notes) is preserved verbatim across runs
+- **`scripts/shared/knowledge_sync.py`** — reusable primitives:
+  `find_sections`, `update_section`, `fence_section`, `diff_summary`,
+  `read_local_source`. Validates marker pairing (orphan start/end and
+  duplicate names raise `KnowledgeSyncError`); update is idempotent
+- **`skills/knowledge-sync/scripts/sync.py`** — runner with
+  `--agent`, `--project-root`, and `--dry-run`. Emits a JSON report
+  per source with status (`unchanged`, `would-change`, `changed`,
+  `missing-section`, `source-missing`, `target-missing`,
+  `invalid-target`, `marker-error`, `write-error`). Exit 0 on full
+  success, 1 on any per-source failure — usable as a CI gate
+- **`/aida knowledge sync` + `/aida knowledge status`** routed through
+  the aida dispatcher; help text updated
+- 19 tests for the section primitives + 8 end-to-end tests for the
+  runner (apply, dry-run, unchanged, missing source, missing markers,
+  no sources.yml, malformed sources.yml, invalid target)
+
+### Changed
+
+- `.claude-plugin/aida-config.json` — added `knowledge-sync` to the
+  skills list so it ships with the plugin
+
+### Notes
+
+- Phase 1 only supports `type: local` sources (path relative to the
+  project root). Remote source types (HTTP, GitHub, npm) are
+  intentionally deferred — the runner returns `source-missing` for
+  any non-local type, leaving the door open for future fetchers
+  without breaking the source declaration schema
+- REUSE.toml gained a `**/__pycache__/**` + `**/*.pyc` annotation so
+  `reuse lint` stays clean across local dev runs that leave bytecode
+  caches in the tree
+
+---
+
 ## [1.5.28] - 2026-05-23
 
 ### Added
