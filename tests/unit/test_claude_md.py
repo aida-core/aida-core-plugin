@@ -13,6 +13,7 @@ import json
 import tempfile
 import shutil
 from pathlib import Path
+from unittest import mock
 
 # Add scripts directories to path for imports
 _project_root = Path(__file__).parent.parent.parent
@@ -513,6 +514,97 @@ Just some content without proper sections.
         self.assertFalse(results["valid"])
         self.assertTrue(len(results["errors"]) > 0)
 
+    def test_validate_user_scope_no_required_sections(self):
+        """User-scope files don't need overview/commands sections.
+
+        Regression for #99: previously the validator applied
+        project-scope required-sections to every file, so a perfectly
+        well-formed user-scope CLAUDE.md (Default Behaviors / Patterns
+        / Tool Config) was flagged invalid. User-scope is free-form
+        preferences and has no required sections.
+        """
+        content = """---
+type: documentation
+title: User CLAUDE.md
+---
+
+# CLAUDE.md
+
+## Default Behaviors
+
+Be terse.
+
+## Cross-Project Patterns
+
+Conventional commits.
+
+## Editor/Tool Configuration
+
+VS Code.
+"""
+        claude_md = self.temp_path / "CLAUDE.md"
+        claude_md.write_text(content)
+
+        results = validate_claude_md(claude_md, scope="user")
+
+        self.assertTrue(
+            results["valid"],
+            f"user-scope should be valid; got errors: {results['errors']}",
+        )
+        self.assertEqual(results["errors"], [])
+
+    def test_validate_plugin_scope_no_required_sections(self):
+        """Plugin-scope files don't need overview/commands either.
+
+        Same #99 family: plugin-scope templates don't ship an Overview
+        or Key Commands section, so requiring them produced false
+        negatives on the scaffold's own output.
+        """
+        content = """---
+type: documentation
+title: Demo Plugin
+---
+
+# Demo Plugin
+
+## Usage
+
+Run things.
+"""
+        claude_md = self.temp_path / "CLAUDE.md"
+        claude_md.write_text(content)
+
+        results = validate_claude_md(claude_md, scope="plugin")
+
+        self.assertTrue(
+            results["valid"],
+            f"plugin-scope should be valid; got errors: {results['errors']}",
+        )
+
+    def test_validate_project_scope_still_requires_sections(self):
+        """Project-scope keeps the existing overview/commands requirement.
+
+        Guard against the #99 fix accidentally relaxing project-scope
+        validation, which is the most common case.
+        """
+        content = """---
+type: documentation
+---
+
+# CLAUDE.md
+
+Just some content without proper sections.
+"""
+        claude_md = self.temp_path / "CLAUDE.md"
+        claude_md.write_text(content)
+
+        results = validate_claude_md(claude_md, scope="project")
+
+        self.assertFalse(results["valid"])
+        joined_errors = " ".join(results["errors"])
+        self.assertIn("overview", joined_errors)
+        self.assertIn("commands", joined_errors)
+
     def test_validate_nonexistent_file(self):
         """Test validation handles nonexistent file."""
         results = validate_claude_md(self.temp_path / "nonexistent.md")
@@ -767,6 +859,86 @@ class TestExecuteCreate(unittest.TestCase):
 
         self.assertFalse(result["success"])
         self.assertIn("already exists", result["message"])
+
+    def test_create_user_scope_persists_responses(self):
+        """User-scope create wires --responses payload into template_vars.
+
+        Regression for #98: previously execute_create only built
+        template_vars from project-scope keys, so user-scope responses
+        (default_behaviors / patterns / tool_config) were silently
+        dropped and the file rendered with placeholder text while the
+        operation still returned success:true.
+        """
+        import os
+        os.chdir(self.temp_path)
+
+        fake_home = self.temp_path / "fake_home"
+        (fake_home / ".claude").mkdir(parents=True)
+
+        responses = {
+            "default_behaviors": "Be terse. No emojis.",
+            "patterns": "Conventional commits everywhere.",
+            "tool_config": "VS Code; iTerm2; 1Password CLI.",
+        }
+        context = {"operation": "create", "scope": "user"}
+
+        with mock.patch.object(Path, "home", return_value=fake_home):
+            result = execute(context, responses, TEMPLATES_DIR)
+
+        self.assertTrue(result["success"], result.get("message"))
+
+        written = (fake_home / ".claude" / "CLAUDE.md").read_text()
+        self.assertIn("Be terse. No emojis.", written)
+        self.assertIn("Conventional commits everywhere.", written)
+        self.assertIn("VS Code; iTerm2; 1Password CLI.", written)
+        # And the placeholder text must NOT be there
+        self.assertNotIn(
+            "Add your preferred default behaviors here.", written
+        )
+
+    def test_create_plugin_scope_persists_responses(self):
+        """Plugin-scope create wires --responses into template_vars.
+
+        Same root cause as #98: plugin.md.jinja2 references plugin_type,
+        provides, usage, config_options, extension_points — none were
+        threaded through before. Covered here to prevent the same
+        regression in the plugin-scope path.
+        """
+        import os
+        os.chdir(self.temp_path)
+        (self.temp_path / ".claude-plugin").mkdir()
+
+        responses = {
+            "plugin_type": "Skill collection",
+            "provides": ["agent-manager", "skill-manager"],
+            "usage": "Invoke /aida agent create to scaffold an agent.",
+            "config_options": "No runtime config — operates on files.",
+            "extension_points": "Drop new templates in templates/.",
+        }
+        context = {
+            "operation": "create",
+            "scope": "plugin",
+            "name": "Demo Plugin",
+            "description": "Demo plugin for testing.",
+        }
+
+        result = execute(context, responses, TEMPLATES_DIR)
+        self.assertTrue(result["success"], result.get("message"))
+
+        written = (
+            self.temp_path / ".claude-plugin" / "CLAUDE.md"
+        ).read_text()
+        self.assertIn("Skill collection", written)
+        self.assertIn("agent-manager", written)
+        self.assertIn(
+            "Invoke /aida agent create to scaffold an agent.", written
+        )
+        self.assertIn(
+            "No runtime config — operates on files.", written
+        )
+        self.assertIn(
+            "Drop new templates in templates/.", written
+        )
 
 
 class TestSafeJsonLoad(unittest.TestCase):
