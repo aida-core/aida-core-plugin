@@ -40,6 +40,7 @@ from typing import Any
 import _paths  # noqa: F401
 
 from shared.utils import safe_json_load  # noqa: E402
+from operations import agents as agents_op  # noqa: E402
 from operations import deps  # noqa: E402
 from operations import extensions  # noqa: E402
 from operations import scaffold  # noqa: E402
@@ -90,6 +91,18 @@ def is_deps_operation(context: dict[str, Any]) -> bool:
     return context.get("operation") == "deps"
 
 
+def is_agents_operation(context: dict[str, Any]) -> bool:
+    """Determine if this is an agents-registry operation (#20).
+
+    Args:
+        context: Operation context
+
+    Returns:
+        True if the operation is `agents`
+    """
+    return context.get("operation") == "agents"
+
+
 def get_questions(
     context: dict[str, Any],
 ) -> dict[str, Any]:
@@ -109,6 +122,9 @@ def get_questions(
 
     if is_deps_operation(context):
         return deps.get_questions(context)
+
+    if is_agents_operation(context):
+        return agents_op.get_questions(context)
 
     # Force type to plugin for extension operations
     context["type"] = "plugin"
@@ -139,6 +155,9 @@ def execute(
 
     if is_deps_operation(context):
         return deps.execute(context, responses)
+
+    if is_agents_operation(context):
+        return agents_op.execute(context, responses)
 
     # Force type to plugin for extension operations
     context["type"] = "plugin"

@@ -171,7 +171,7 @@ For `plugin` commands (including `plugin scaffold`):
 - **Invoke the `plugin-manager` skill** to handle these operations
 - Pass the full command arguments to the skill
 - The skill handles create, validate, version, list, scaffold, update,
-  and deps operations
+  deps, and agents operations
 - Scaffold creates a NEW plugin project (not an extension inside an existing
   project)
 - Update scans an existing plugin and patches it to current standards
@@ -198,6 +198,8 @@ For `plugin` commands (including `plugin scaffold`):
 /aida plugin update "/path/to/plugin"   → plugin-manager skill
 /aida plugin deps                        → plugin-manager skill (cwd)
 /aida plugin deps "/path/to/plugin"     → plugin-manager skill
+/aida plugin agents                      → plugin-manager skill (cwd)
+/aida plugin agents "/path/to/project"  → plugin-manager skill
 ```
 
 ### Hook Management Commands
