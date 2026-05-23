@@ -92,8 +92,14 @@ jobs:
       # --strict fails on any vulnerability, including dev-only deps.
       # Runs after install so it audits the actual pinned tree, not
       # the requirements files in isolation.
+      #
+      # The venv's bundled pip is upgraded first because pip itself
+      # is in the audited dependency tree — CI runners ship pip 24.0
+      # which has known CVEs that newer versions resolve. Upgrading
+      # pip is a no-op for our runtime/dev deps; we don't pin it.
       - name: Audit Python dependencies for known CVEs
         run: |
+          ~/.aida/venv/bin/pip install --quiet --upgrade pip
           ~/.aida/venv/bin/pip install --quiet pip-audit
           ~/.aida/venv/bin/pip-audit --strict
 
