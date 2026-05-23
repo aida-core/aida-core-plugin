@@ -13,6 +13,27 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.6] - 2026-05-22
+
+### Added
+
+- `tests/unit/test_scaffold_generators.py::TestAssembleGitignore::test_gitignore_does_not_blanket_ignore_claude_dir`
+  — regression guard for #95. Asserts that the scaffolded
+  `.gitignore` contains the narrow exclusion
+  `.claude/settings.local.json` and does **not** contain a bare
+  `.claude/` line that would shadow `/aida config` outputs (which
+  are committable team-shared state). The bug was fixed in PR #62
+  (commit `48a882c`) by switching the template from `.claude/` to
+  `.claude/settings.local.json`; this test pins the fix.
+
+### Notes
+
+- No behavior change in this release; the underlying bug has been
+  fixed since PR #62
+- Milestone: `1.6.0 — Bug fixes`
+
+---
+
 ## [1.5.5] - 2026-05-22
 
 ### Added
