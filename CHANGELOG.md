@@ -13,6 +13,51 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.25] - 2026-05-23
+
+### Added
+
+- **Issue templates** in `.github/ISSUE_TEMPLATE/` (#53 part 4) —
+  form-based GitHub templates for bug reports and feature
+  requests, plus a `config.yml` that points heavy users at
+  `/aida bug` / `/aida feature-request` (which auto-collect
+  environment context) and at GitHub Security Advisories for
+  vuln disclosures. Blank issues disabled
+- **`.github/PULL_REQUEST_TEMPLATE.md`** — short Summary / Test
+  plan / Notes template matching the pattern used throughout
+  this session's PRs
+- **`.pre-commit-config.yaml`** at repo root — optional local
+  hook config that mirrors `make lint`: ruff (lint + format),
+  yamllint, REUSE, plus bare-minimum hygiene hooks
+  (trailing whitespace, EOL, large-file guard, JSON/YAML/TOML
+  syntax). Contributors install with
+  `pip install pre-commit && pre-commit install`. CI runs the
+  same checks regardless
+- **`.github/workflows/release.yml`** — tag-triggered release
+  workflow. On push of a `v*` tag:
+  - Verifies the tag's version matches `.claude-plugin/plugin.json`
+    (catches a tag pushed before the manifest bump)
+  - Extracts the matching `## [<version>] - YYYY-MM-DD` section
+    from CHANGELOG.md
+  - Creates a GitHub Release with the extracted notes
+  Uses minimum-required permissions (`contents: write` scoped
+  to the release job only) and a SHA-pinned `actions/checkout`
+
+### Notes
+
+- Closes the last code-side items in #53. Remaining checklist
+  item is **Dependabot alerts** on the repo, which is a
+  GitHub UI setting (can't be done via PR)
+- Once #53 is fully closed, the remaining "stale"-feel
+  milestones (0.9.0 / 1.1.0) are the only chore-shaped
+  artifacts in the milestone view
+- After this lands, the natural next step is **cutting a
+  release** — 24 unreleased version bumps now sitting on main
+  (1.5.2 → 1.5.25), and the new release.yml workflow makes
+  that mechanical
+
+---
+
 ## [1.5.24] - 2026-05-23
 
 ### Changed

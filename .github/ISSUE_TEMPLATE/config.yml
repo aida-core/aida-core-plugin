@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The AIDA Core Authors
+# SPDX-License-Identifier: MPL-2.0
+---
+# GitHub issue chooser config. Disables blank issues so contributors
+# pick a template, and points heavy users at the /aida feedback flows
+# which auto-fill environment context.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Use /aida feedback (preferred for AIDA users)
+    url: https://github.com/aida-core/aida-core-plugin#feedback--support
+    about: >-
+      If you're running AIDA, `/aida bug` and `/aida feature-request`
+      auto-collect environment context (OS, Python, Node, AIDA
+      version) and prefill the right template. Faster than filling
+      this out by hand.
+
+  - name: Security disclosure
+    url: https://github.com/aida-core/aida-core-plugin/security/advisories/new
+    about: >-
+      DO NOT report security issues as public issues. Use GitHub
+      Security Advisories or email github@oakensoul.com per
+      SECURITY.md.

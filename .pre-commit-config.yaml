@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: 2026 The AIDA Core Authors
+# SPDX-License-Identifier: MPL-2.0
+---
+# Pre-commit configuration (#53). Mirrors what `make lint` runs in
+# CI so contributors catch issues locally before push.
+#
+# Setup:
+#   pip install pre-commit && pre-commit install
+#
+# This config is optional — CI runs the same checks regardless.
+# Local hooks just shorten the feedback loop.
+
+repos:
+  # ruff (Python lint + format). Single tool for both surfaces;
+  # config lives in pyproject.toml / ruff.toml of the consumer.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.0
+    hooks:
+      - id: ruff
+        name: ruff (lint)
+        args:
+          - --fix
+      - id: ruff-format
+        name: ruff (format)
+
+  # yamllint (YAML structure / indentation / document-start).
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: yamllint
+        args:
+          - -c
+          - .yamllint.yml
+
+  # REUSE / SPDX header compliance. Runs `reuse lint` which validates
+  # that every source file has copyright + license metadata.
+  - repo: https://github.com/fsfe/reuse-tool
+    rev: v4.0.3
+    hooks:
+      - id: reuse
+        name: reuse lint
+
+  # Bare-minimum hygiene: trailing whitespace, EOL, large-file guard,
+  # JSON/YAML/TOML syntax. Catch broad mistakes before CI does.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args:
+          - --maxkb=512
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
