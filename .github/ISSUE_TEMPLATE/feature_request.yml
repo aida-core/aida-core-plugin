@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: 2026 The AIDA Core Authors
+# SPDX-License-Identifier: MPL-2.0
+---
+name: Feature Request
+description: Suggest a new capability or improve an existing one.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion! Before filing, please check whether
+        the idea is **in scope** for aida-core-plugin (Claude Code
+        plugin foundation — configure, scaffold, manage extensions).
+        Issues like polyrepo migration tools or general devops
+        helpers are typically out of scope; consider a separate repo
+        for those.
+
+        If you're running AIDA, `/aida feature-request` pre-fills
+        this template.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the pain point in your own words. Real
+        examples help.
+      placeholder: e.g., "Scaffolding a markdown-only plugin gives me
+        a Python toolchain I don't want."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How might this work? A sketch is fine; we'll
+        refine in discussion.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else did you try or think about?
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Real-world artifacts, references to prior work,
+        related issues, etc.
+    validations:
+      required: false

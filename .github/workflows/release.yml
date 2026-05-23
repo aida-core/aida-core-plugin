@@ -1,0 +1,99 @@
+# SPDX-FileCopyrightText: 2026 The AIDA Core Authors
+# SPDX-License-Identifier: MPL-2.0
+
+---
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Least-privilege at the workflow level. The `release` job
+# explicitly bumps to `contents: write` only for its own scope so
+# it can create the GitHub Release. Every other token use defaults
+# to read-only.
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Releasing ${TAG} (version ${VERSION})"
+
+      - name: Verify plugin.json matches tag
+        run: |
+          set -euo pipefail
+          MANIFEST_VERSION=$(jq -r '.version' .claude-plugin/plugin.json)
+          if [[ "${MANIFEST_VERSION}" != "${{ steps.version.outputs.version }}" ]]; then
+            msg="Tag ${{ steps.version.outputs.tag }} (version"
+            msg="${msg} ${{ steps.version.outputs.version }}) doesn't"
+            msg="${msg} match plugin.json (version ${MANIFEST_VERSION})."
+            msg="${msg} Did you forget to bump the manifest?"
+            echo "::error::${msg}"
+            exit 1
+          fi
+          echo "OK: tag matches plugin.json"
+
+      - name: Extract CHANGELOG section for this version
+        id: changelog
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          ESCAPED=$(printf '%s' "${VERSION}" | sed 's/[.[\*^$()+?{|]/\\&/g')
+
+          # Capture the section starting with '## [<VERSION>]' up to
+          # (but not including) the next '## [' heading.
+          NOTES=$(awk -v ver="${ESCAPED}" '
+            $0 ~ "^## \\[" ver "\\]" { in_section = 1; next }
+            in_section && /^## \[/ { exit }
+            in_section { print }
+          ' CHANGELOG.md)
+
+          if [[ -z "${NOTES// }" ]]; then
+            msg="No CHANGELOG section found for version ${VERSION}."
+            msg="${msg} Add a '## [${VERSION}] - YYYY-MM-DD' heading"
+            msg="${msg} before tagging."
+            echo "::error file=CHANGELOG.md::${msg}"
+            exit 1
+          fi
+
+          # Multi-line outputs need the delimiter form.
+          {
+            echo "notes<<RELEASE_NOTES_EOF"
+            echo "${NOTES}"
+            echo "RELEASE_NOTES_EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # `--notes-file -` reads from stdin so we don't have to
+          # quote multi-line markdown into a shell arg.
+          cat <<'RELEASE_NOTES_EOF' | gh release create "${TAG}" \
+            --title "v${VERSION}" \
+            --verify-tag \
+            --notes-file -
+          ${{ steps.changelog.outputs.notes }}
+          RELEASE_NOTES_EOF

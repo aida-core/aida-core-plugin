@@ -1,0 +1,85 @@
+# SPDX-FileCopyrightText: 2026 The AIDA Core Authors
+# SPDX-License-Identifier: MPL-2.0
+---
+name: Bug Report
+description: Something works incorrectly or fails to work.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report! Please fill
+        in the fields below — even partial info is more useful than
+        none.
+
+        If you're running AIDA, `/aida bug` auto-collects the
+        environment block and pre-fills this template. That's the
+        path of least resistance.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: What went wrong?
+      placeholder: e.g., "/aida config crashes when ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How disruptive is this?
+      options:
+        - Minor (annoying but not blocking)
+        - Major (blocks a real workflow; workaround exists)
+        - Critical (no workaround; data loss or silent corruption)
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered list, exact commands where possible.
+      placeholder: |
+        1. Run `/aida config`
+        2. Select 'Configure this project'
+        3. Observe error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you think would happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened? Paste error messages /
+        stack traces verbatim.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, Node version, AIDA version.
+        `/aida bug` fills this in for you.
+      placeholder: |
+        - OS: Darwin 25.x
+        - Python: 3.x
+        - Node: vXX
+        - AIDA: 1.5.x
+      render: text
+    validations:
+      required: false
