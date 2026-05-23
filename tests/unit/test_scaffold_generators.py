@@ -221,6 +221,92 @@ class TestRenderSharedFiles(unittest.TestCase):
             self.assertFalse((target / "REUSE.toml").exists())
     # REUSE-IgnoreEnd
 
+    def test_yamllint_config_ignores_node_modules(self):
+        """yamllint must skip node_modules / venv / generated dirs.
+
+        Regression for #82 bug 2: `yamllint -c .yamllint.yml .`
+        recursively scans `node_modules/` by default, producing
+        hundreds of failures from third-party YAML we don't own. The
+        config's top-level `ignore:` block prunes those.
+        """
+        import yaml
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            render_shared_files(
+                target, self._build_variables(), TEMPLATES_DIR
+            )
+            yamllint_cfg = yaml.safe_load(
+                (target / ".yamllint.yml").read_text()
+            )
+
+            ignore_field = yamllint_cfg.get("ignore", "")
+            # `ignore:` is a YAML literal block scalar; parse it as
+            # newline-separated paths.
+            ignored = {
+                line.strip()
+                for line in ignore_field.splitlines()
+                if line.strip()
+            }
+            for required in (
+                "node_modules/",
+                "dist/",
+                "coverage/",
+                "build/",
+                "__pycache__/",
+                ".venv/",
+                "venv/",
+            ):
+                self.assertIn(
+                    required,
+                    ignored,
+                    f"yamllint config must ignore {required}; "
+                    f"got: {ignored}",
+                )
+
+    def test_markdownlint_disables_real_prose_rules(self):
+        """Markdownlint must disable rules that conflict with skill /
+        agent prose.
+
+        Regression for #82 bug 3 + #92: AIDA skill stubs use
+        `<PRD>` / `<ticket>` placeholders (would trip MD033 inline
+        HTML), tight technical prose without blanks around lists or
+        headings (MD032 / MD022), bold-as-heading patterns like
+        `**Last updated:** ...` (MD036), code blocks without language
+        tags in docs (MD040), and bare URLs (MD034). Across 9 repos
+        and ~40 PRs in the reporter's environment, none of these
+        rules caught real problems — they all flagged stylistic
+        conventions in scaffolded output.
+
+        These rules must be explicitly set to `false`:
+        """
+        import json as _json
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            render_shared_files(
+                target, self._build_variables(), TEMPLATES_DIR
+            )
+            cfg = _json.loads(
+                (target / ".markdownlint.json").read_text()
+            )
+            for rule in (
+                "MD022",
+                "MD025",
+                "MD032",
+                "MD033",
+                "MD034",
+                "MD036",
+                "MD040",
+                "MD041",
+            ):
+                self.assertIs(
+                    cfg.get(rule),
+                    False,
+                    f"markdownlint rule {rule} must be disabled; "
+                    f"got {cfg.get(rule)!r}",
+                )
+
 
 class TestAssembleGitignore(unittest.TestCase):
     """Test .gitignore assembly."""

@@ -5,6 +5,20 @@
 
 extends: default
 
+# Exclude vendored / generated directories. yamllint walks them
+# otherwise — node_modules/ alone can produce hundreds of failures
+# from third-party YAML that we don't own (#82).
+ignore: |
+  node_modules/
+  dist/
+  coverage/
+  build/
+  __pycache__/
+  .venv/
+  venv/
+  .pytest_cache/
+  .ruff_cache/
+
 rules:
   # Allow longer lines - plugin configs often have descriptive text
   line-length:

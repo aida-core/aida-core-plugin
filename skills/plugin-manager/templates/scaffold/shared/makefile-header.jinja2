@@ -13,12 +13,20 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 
-# Linting (shared)
+# Linting (shared).
+# `npx --yes markdownlint-cli`:
+#   TS scaffolds: resolves to the version in devDependencies (no
+#     network round-trip after `npm install`)
+#   Python / globally-installed: --yes suppresses the install prompt
+#     so CI doesn't hang on first run
+# `--config .markdownlint.json` is passed explicitly because
+# markdownlint-cli auto-discovery can silently miss the config when
+# invoked through `npx` from non-package-root cwd.
 lint-md: ## Run markdownlint on Markdown files
-	markdownlint '**/*.md' --ignore node_modules
+	npx --yes markdownlint-cli '**/*.md' --ignore node_modules --config .markdownlint.json
 
 lint-fix-md: ## Fix markdownlint issues
-	markdownlint '**/*.md' --ignore node_modules --fix
+	npx --yes markdownlint-cli '**/*.md' --ignore node_modules --config .markdownlint.json --fix
 
 lint-yaml: ## Run yamllint on YAML files
 	yamllint -c .yamllint.yml .
