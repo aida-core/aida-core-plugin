@@ -16,6 +16,32 @@ from typing import Any, Dict, Optional
 import yaml
 HAS_YAML = True
 
+
+class _IndentedDumper(yaml.SafeDumper):
+    """SafeDumper that indents sequence items inside their parent.
+
+    PyYAML's default emits sequences flush with the parent key:
+
+        tools:
+          detected:
+          - Git
+          - GitHub Actions
+
+    yamllint's `indentation` rule (with `indent-sequences: true`, the
+    default) expects sequence items indented one level deeper:
+
+        tools:
+          detected:
+            - Git
+            - GitHub Actions
+
+    Overriding `increase_indent` to never go indentless restores the
+    expected indentation.
+    """
+
+    def increase_indent(self, flow=False, indentless=False):
+        return super().increase_indent(flow, False)
+
 # Try to import fcntl for Unix file locking
 try:
     import fcntl
@@ -245,7 +271,19 @@ def write_yaml(path: Path, data: Dict[str, Any], create_parents: bool = True) ->
         >>> write_yaml(Path("config.yml"), {"setting": "value"})
     """
     try:
-        content = yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        # explicit_start emits a `---` document marker; the custom
+        # Dumper indents sequences inside their parent. Together these
+        # produce yamllint-default-clean output so consumers (including
+        # every scaffolded plugin that enforces yamllint) don't have
+        # to special-case AIDA-generated files.
+        content = yaml.dump(
+            data,
+            Dumper=_IndentedDumper,
+            default_flow_style=False,
+            sort_keys=False,
+            allow_unicode=True,
+            explicit_start=True,
+        )
         write_file(path, content, create_parents=create_parents)
 
     except yaml.YAMLError as e:

@@ -36,6 +36,7 @@ from utils import (
     write_file,
     read_json,
     write_json,
+    write_yaml,
     update_json,
     copy_template,
     file_exists,
@@ -352,6 +353,160 @@ class TestFiles(unittest.TestCase):
             self.assertTrue(directory_exists(test_dir))
             self.assertFalse(directory_exists(Path(tmpdir) / "missing"))
             self.assertFalse(directory_exists(Path(tmpdir) / "file.txt"))
+
+    def test_write_yaml_emits_document_start(self):
+        """write_yaml output must start with `---`.
+
+        Regression for #97: yamllint's default `document-start` rule
+        requires a `---` marker, and the scaffolder enforces this rule
+        in every plugin it generates. AIDA-generated YAML must clear
+        the same bar.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "config.yml"
+            write_yaml(test_file, {"key": "value"})
+
+            content = test_file.read_text(encoding="utf-8")
+            self.assertTrue(
+                content.startswith("---\n"),
+                f"output must start with '---'; got: {content!r}",
+            )
+
+    def test_write_yaml_indents_nested_sequences(self):
+        """Sequence items must be indented inside their parent key.
+
+        Regression for #81 and #97: PyYAML's default emits
+        `tools:\\n  detected:\\n  - Git` (items flush with parent at
+        column 2). yamllint's `indentation` rule with
+        `indent-sequences: true` (the default) expects items at column
+        4. The custom Dumper restores the expected indentation.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "context.yml"
+            write_yaml(
+                test_file,
+                {"tools": {"detected": ["Git", "GitHub Actions"]}},
+            )
+
+            content = test_file.read_text(encoding="utf-8")
+            # Sequence items must be at column 4 (4 leading spaces),
+            # not column 2 — the bug being fixed.
+            self.assertIn("    - Git\n", content)
+            self.assertIn("    - GitHub Actions\n", content)
+            # Stronger guard: assert the bug pattern literally isn't
+            # present by checking line-by-line rather than substring.
+            for line in content.splitlines():
+                if "- Git" in line:
+                    self.assertTrue(
+                        line.startswith("    - "),
+                        f"Sequence item under-indented: {line!r}",
+                    )
+
+    def test_write_yaml_roundtrip(self):
+        """Round-trip through write_yaml + yaml.safe_load preserves data.
+
+        Guards against the new Dumper accidentally mangling content.
+        """
+        import yaml
+
+        data = {
+            "version": "1.5.2",
+            "project": {"name": "demo"},
+            "tools": {"detected": ["Git", "GitHub Actions"]},
+            "plugins": ["aida-core"],
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "roundtrip.yml"
+            write_yaml(test_file, data)
+            loaded = yaml.safe_load(
+                test_file.read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(loaded, data)
+
+    def test_write_yaml_top_level_sequence(self):
+        """A top-level sequence still renders correctly.
+
+        Indentless-sequence is only inappropriate inside a mapping; a
+        bare top-level list should still emit `- item` at column 0.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "list.yml"
+            write_yaml(test_file, ["alpha", "beta"])
+
+            content = test_file.read_text(encoding="utf-8")
+            self.assertTrue(content.startswith("---\n"))
+            self.assertIn("- alpha\n", content)
+            self.assertIn("- beta\n", content)
+
+
+class TestAidaYmlRenderers(unittest.TestCase):
+    """Test the YAML marker renderers in install.py and configure.py.
+
+    Both render via string concatenation (not write_yaml), so the
+    `document-start` fix is local to each. These guards keep the
+    yamllint-clean shape from drifting back.
+    """
+
+    def test_render_aida_marker_starts_with_doc_start(self):
+        """Global ~/.claude/aida.yml must start with `---`. (#97)"""
+        from install import render_aida_marker
+
+        content = render_aida_marker({})
+
+        self.assertTrue(
+            content.startswith("---\n"),
+            f"render_aida_marker output must start with '---'; "
+            f"got first line: {content.splitlines()[0]!r}",
+        )
+
+    def test_render_aida_marker_is_yamllint_compatible(self):
+        """Generated content must parse as valid YAML.
+
+        Cheap structural check — doesn't pull in yamllint as a runtime
+        dep, but catches gross syntax regressions from the renderer.
+        """
+        import yaml
+        from install import render_aida_marker
+
+        content = render_aida_marker({})
+        loaded = yaml.safe_load(content)
+
+        self.assertIsInstance(loaded, dict)
+        self.assertIn("version", loaded)
+        self.assertIn("plugins", loaded)
+
+    def test_render_aida_project_marker_starts_with_doc_start(self):
+        """Project .claude/aida.yml must start with `---`. (#97)"""
+        from configure import render_aida_project_marker
+
+        content = render_aida_project_marker(
+            preferences={"project_type": "Plugin"},
+            project_name="demo",
+        )
+
+        self.assertTrue(
+            content.startswith("---\n"),
+            f"render_aida_project_marker output must start with '---'; "
+            f"got first line: {content.splitlines()[0]!r}",
+        )
+
+    def test_render_aida_project_marker_is_yamllint_compatible(self):
+        """Generated project marker content must parse as valid YAML."""
+        import yaml
+        from configure import render_aida_project_marker
+
+        content = render_aida_project_marker(
+            preferences={
+                "project_type": "Plugin",
+                "team_collaboration": "Open source",
+            },
+            project_name="demo",
+        )
+        loaded = yaml.safe_load(content)
+
+        self.assertIsInstance(loaded, dict)
+        self.assertEqual(loaded["project"]["name"], "demo")
 
 
 class TestQuestionnaire(unittest.TestCase):

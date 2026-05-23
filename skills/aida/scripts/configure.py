@@ -183,8 +183,11 @@ def render_aida_project_marker(preferences: Dict[str, Any], project_name: str) -
     if "documentation_level" in preferences:
         config["documentation_level"] = preferences["documentation_level"]
 
-    # Build YAML content
-    content = f"""# AIDA Project Configuration Marker
+    # Build YAML content. Leading `---` is required for yamllint's
+    # default `document-start` rule (which the scaffolder enforces in
+    # every plugin we generate).
+    content = f"""---
+# AIDA Project Configuration Marker
 # This file indicates AIDA is configured for this project
 version: "{AIDA_VERSION}"
 configured: "{timestamp}"

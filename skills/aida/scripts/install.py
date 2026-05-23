@@ -304,8 +304,11 @@ def render_aida_marker(detected_data: Dict[str, Any]) -> str:
     # Extract relevant metadata
     plugins = ["aida-core"]
 
-    # Build YAML content (metadata only - NO preferences)
-    content = f"""# AIDA Installation Marker
+    # Build YAML content (metadata only - NO preferences).
+    # Leading `---` is required for yamllint's default `document-start`
+    # rule, which the scaffolder enforces in every plugin we generate.
+    content = f"""---
+# AIDA Installation Marker
 # This file indicates AIDA is installed and tracks metadata
 # User preferences are stored in ~/.claude/skills/user-context/SKILL.md
 version: "{AIDA_VERSION}"
