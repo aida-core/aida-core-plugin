@@ -21,7 +21,9 @@ sys.modules.pop("_paths", None)
 
 from operations.scaffold_ops.licenses import (  # noqa: E402
     get_license_text,
+    is_valid_license_id,
     LICENSES,
+    PROMPT_LICENSE_OPTIONS,
     SUPPORTED_LICENSES,
 )
 
@@ -86,26 +88,114 @@ class TestGetLicenseText(unittest.TestCase):
         self.assertNotIn("{year}", text)
         self.assertNotIn("{author_name}", text)
 
-    def test_unknown_license_raises_value_error(self):
-        """Unknown license IDs should raise ValueError."""
-        with self.assertRaises(ValueError) as cm:
-            get_license_text("UNKNOWN-LICENSE", "2026", "Author")
-        self.assertIn("Unsupported license", str(cm.exception))
-        self.assertIn("UNKNOWN-LICENSE", str(cm.exception))
-
     def test_supported_licenses_list(self):
         """SUPPORTED_LICENSES should match LICENSES dict keys."""
         self.assertEqual(set(SUPPORTED_LICENSES), set(LICENSES.keys()))
 
     def test_licenses_count(self):
-        """Should have exactly 6 supported licenses."""
+        """Should have exactly 6 fully-bundled licenses."""
         self.assertEqual(len(SUPPORTED_LICENSES), 6)
+
+    def test_prompt_option_cap(self):
+        """Interactive prompt options must fit AskUserQuestion's
+        4-option cap (#85, #111).
+        """
+        self.assertLessEqual(len(PROMPT_LICENSE_OPTIONS), 4)
+        # Sanity: every prompt option must be either a fully-bundled
+        # license or a recognized placeholder.
+        for opt in PROMPT_LICENSE_OPTIONS:
+            self.assertTrue(
+                is_valid_license_id(opt),
+                f"PROMPT_LICENSE_OPTIONS contains an invalid id: {opt}",
+            )
 
     def test_format_string_injection_safe(self):
         """Author names with format-like patterns should not cause errors."""
         # This should not raise KeyError or other format-related errors
         text = get_license_text("MIT", "2026", "Author {with} {curly} braces")
         self.assertIn("Author {with} {curly} braces", text)
+
+
+class TestIsValidLicenseId(unittest.TestCase):
+    """Test the loose SPDX-id validator that gates scaffold input."""
+
+    def test_known_license_is_valid(self):
+        for lic in ("MIT", "Apache-2.0", "GPL-3.0", "ISC", "AGPL-3.0"):
+            self.assertTrue(is_valid_license_id(lic))
+
+    def test_placeholder_is_valid(self):
+        # UNLICENSED + friends are valid scaffold input even though
+        # they're not real SPDX ids — downstream they suppress the
+        # License-Identifier header.
+        for lic in ("UNLICENSED", "Proprietary", "PROPRIETARY"):
+            self.assertTrue(is_valid_license_id(lic))
+
+    def test_other_spdx_id_is_valid(self):
+        # Real SPDX ids we don't bundle text for must still validate.
+        for lic in (
+            "MPL-2.0",
+            "BSD-3-Clause",
+            "LGPL-3.0-or-later",
+            "GPL-3.0-only",
+            "0BSD",
+            "Unlicense",
+        ):
+            self.assertTrue(
+                is_valid_license_id(lic),
+                f"Real SPDX id {lic!r} should validate",
+            )
+
+    def test_empty_or_whitespace_rejected(self):
+        for lic in ("", " ", "  ", "\t"):
+            self.assertFalse(is_valid_license_id(lic))
+
+    def test_shell_metacharacters_rejected(self):
+        # Defense in depth — license_id flows into file content but
+        # could end up in a shell context (e.g., next-steps printing).
+        for bad in (
+            "MIT; rm -rf /",
+            "MIT && evil",
+            "MIT $(whoami)",
+            "MIT`evil`",
+            "MIT|pipe",
+            "MIT\nnewline",
+        ):
+            self.assertFalse(
+                is_valid_license_id(bad),
+                f"Suspicious id should be rejected: {bad!r}",
+            )
+
+
+class TestGetLicenseTextOther(unittest.TestCase):
+    """Test the 'Other' SPDX id path — unknown ids get a placeholder
+    LICENSE instead of an error (#111).
+    """
+
+    def test_unknown_spdx_id_writes_placeholder(self):
+        # MPL-2.0 is a real SPDX id but we don't bundle the full text.
+        # The scaffold should still succeed and write a placeholder.
+        text = get_license_text("MPL-2.0", "2026", "Test Author")
+        self.assertIn("MPL-2.0", text)
+        self.assertIn("Test Author", text)
+        self.assertIn("2026", text)
+        # Placeholder should explicitly point at the SPDX license list
+        # so authors know how to fill it in.
+        self.assertIn("spdx.org/licenses/", text)
+
+    def test_invalid_identifier_still_raises(self):
+        # An id that fails is_valid_license_id (whitespace, shell
+        # metacharacters) must still raise — defense in depth.
+        with self.assertRaises(ValueError):
+            get_license_text("MIT; rm -rf /", "2026", "Author")
+
+    def test_unlicensed_placeholder_uses_attribution_text(self):
+        """All NON_SPDX_PLACEHOLDERS render as proprietary attribution.
+        """
+        for placeholder in ("UNLICENSED", "Proprietary", "PROPRIETARY"):
+            text = get_license_text(placeholder, "2026", "Author")
+            self.assertIn("All rights reserved", text)
+            self.assertIn("2026", text)
+            self.assertIn("Author", text)
 
 
 if __name__ == "__main__":
