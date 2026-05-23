@@ -13,6 +13,43 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 2026-05-22
+
+### Fixed
+
+- `write_yaml` (`skills/aida/scripts/utils/files.py`) now emits a
+  `---` document-start marker and indents sequence items inside their
+  parent key (the expected yamllint-default shape). Affects
+  `.claude/aida-project-context.yml` and `.claude/aida-project-context.local.yml`,
+  which previously failed yamllint with `missing document start "---"`
+  and `wrong indentation: expected 4 but found 2` on nested sequences
+  like `tools.detected`. Implementation: new `_IndentedDumper`
+  (subclass of `yaml.SafeDumper`) overrides `increase_indent` to never
+  go indentless; `yaml.dump` is invoked with `explicit_start=True` and
+  this custom dumper. Fixes #81
+- The two string-concat YAML renderers — `render_aida_marker`
+  (`skills/aida/scripts/install.py`, writes `~/.claude/aida.yml`) and
+  `render_aida_project_marker` (`skills/aida/scripts/configure.py`,
+  writes `.claude/aida.yml`) — now prepend `---` to their output. The
+  comment header still sits at the top of the file, just after the
+  document marker. Fixes #97
+
+### Notes
+
+- All three generated files (`~/.claude/aida.yml`,
+  `.claude/aida.yml`, `.claude/aida-project-context.yml`) are now
+  clean against both the repo's own `.yamllint.yml` and the strict
+  yamllint defaults that scaffolded plugins enforce
+- New tests in `tests/unit/test_utils.py`:
+  `TestFiles.test_write_yaml_emits_document_start`,
+  `test_write_yaml_indents_nested_sequences`,
+  `test_write_yaml_roundtrip`,
+  `test_write_yaml_top_level_sequence`; plus four
+  `TestAidaYmlRenderers` cases for the install / configure renderers
+- Milestone: `1.6.0 — Bug fixes`
+
+---
+
 ## [1.5.2] - 2026-05-22
 
 ### Fixed
