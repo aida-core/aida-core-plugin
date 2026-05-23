@@ -13,6 +13,49 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-05-22
+
+### Fixed
+
+- `claude-md-manager` `create --scope user`: the `--responses` payload
+  was silently dropped because `execute_create` built `template_vars`
+  from project-scope keys only. The user template at
+  `templates/claude-md/user.md.jinja2` references `default_behaviors`,
+  `patterns`, `tool_config`, `preferred_languages`, and
+  `preferred_tools` — none were threaded in, so the file rendered with
+  the template's `default()` placeholder text while the operation
+  still returned `success:true`. `execute_create` now selects the
+  variable set that matches `scope`. Plugin-scope had the same latent
+  bug (`plugin_type`, `provides`, `usage`, `config_options`,
+  `extension_points` were all unwired) and is fixed in the same
+  change. Fixes #98
+- `claude-md-manager validate`: project-scope required sections
+  (`overview`, `commands`) were applied to every file regardless of
+  scope, so a well-formed user-scope or plugin-scope file would fail
+  validation with `Missing required sections: overview, commands`.
+  Required sections are now keyed by scope — project keeps
+  `["overview", "commands"]`, user and plugin have no required
+  sections (free-form). `validate_claude_md`, `calculate_audit_score`,
+  and `generate_audit_findings` now accept an optional `scope`
+  parameter (defaulting to `project` for callers that don't know it).
+  `execute_validate`, `execute_optimize`, and `execute_list` thread
+  the per-file scope through from `file_info["scope"]`. Fixes #99
+
+### Notes
+
+- Both bugs were originally reported against 1.1.5 but reproduced on
+  1.5.1 — the relevant code paths were unchanged between those
+  versions
+- New tests in `tests/unit/test_claude_md.py` cover all three scopes:
+  user-scope create persists `default_behaviors` / `patterns` /
+  `tool_config`; plugin-scope create persists `plugin_type` /
+  `provides` / `usage` / etc.; user-scope and plugin-scope validate
+  succeed without project-style required sections; project-scope
+  validate still requires `overview` + `commands`
+- Milestone: `1.6.0 — Bug fixes`
+
+---
+
 ## [1.5.1] - 2026-04-30
 
 ### Added

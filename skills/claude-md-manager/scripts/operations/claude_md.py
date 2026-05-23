@@ -22,9 +22,25 @@ from .utils import (
     render_template,
 )
 
-# Required sections for validation
-REQUIRED_SECTIONS = ["overview", "commands"]
+# Required sections per scope. project-scope files document a codebase
+# and need overview + commands. user-scope files capture free-form
+# personal preferences; plugin-scope files document a plugin's own surface.
+# Neither benefits from project-style required sections.
+REQUIRED_SECTIONS: Dict[str, List[str]] = {
+    "project": ["overview", "commands"],
+    "user": [],
+    "plugin": [],
+}
 RECOMMENDED_SECTIONS = ["architecture", "conventions", "constraints"]
+
+
+def required_sections_for(scope: str) -> List[str]:
+    """Return the required-section list for a given scope.
+
+    Unknown scopes fall back to the project list so callers that
+    don't know the scope keep their previous behavior.
+    """
+    return REQUIRED_SECTIONS.get(scope, REQUIRED_SECTIONS["project"])
 
 # Template options
 TEMPLATES = {
@@ -404,11 +420,16 @@ def detect_project_context(
     return context
 
 
-def validate_claude_md(path: Path) -> Dict[str, Any]:
+def validate_claude_md(
+    path: Path, scope: str = "project"
+) -> Dict[str, Any]:
     """Validate a CLAUDE.md file.
 
     Args:
         path: Path to CLAUDE.md file
+        scope: 'project', 'user', or 'plugin'. Controls which sections
+            are treated as required. Defaults to 'project' for callers
+            that don't know the scope.
 
     Returns:
         Validation results dictionary
@@ -455,9 +476,9 @@ def validate_claude_md(path: Path) -> Dict[str, Any]:
             "Has frontmatter"
         )
 
-    # Check required sections
+    # Check required sections (scope-aware)
     missing_sections = []
-    for req in REQUIRED_SECTIONS:
+    for req in required_sections_for(scope):
         if req not in sections:
             missing_sections.append(req)
 
@@ -507,13 +528,17 @@ def validate_claude_md(path: Path) -> Dict[str, Any]:
 
 
 def calculate_audit_score(
-    results: Dict[str, Any], sections: List[str]
+    results: Dict[str, Any],
+    sections: List[str],
+    scope: str = "project",
 ) -> int:
     """Calculate audit score (0-100).
 
     Args:
         results: Validation results
         sections: Detected sections
+        scope: 'project', 'user', or 'plugin'. Controls which sections
+            count toward the required-section bonus.
 
     Returns:
         Score from 0 to 100
@@ -525,8 +550,8 @@ def calculate_audit_score(
         if check["pass"]:
             score += 10
 
-    # Add points for sections
-    for section in REQUIRED_SECTIONS:
+    # Add points for required sections present (scope-aware)
+    for section in required_sections_for(scope):
         if section in sections:
             score += 5
 
@@ -546,6 +571,7 @@ def generate_audit_findings(
     content: str,
     validation: Dict[str, Any],
     detected_context: Dict[str, Any],
+    scope: str = "project",
 ) -> List[Dict[str, Any]]:
     """Generate audit findings with fix suggestions.
 
@@ -554,6 +580,8 @@ def generate_audit_findings(
         content: File content
         validation: Validation results
         detected_context: Detected project context
+        scope: 'project', 'user', or 'plugin'. Controls which required
+            sections are checked for fix suggestions.
 
     Returns:
         List of findings with fixes
@@ -561,8 +589,8 @@ def generate_audit_findings(
     findings: List[Dict[str, Any]] = []
     sections = detect_sections(content)
 
-    # Check for missing required sections
-    for req in REQUIRED_SECTIONS:
+    # Check for missing required sections (scope-aware)
+    for req in required_sections_for(scope):
         if req not in sections:
             fix_content = ""
             if req == "commands" and detected_context.get(
@@ -728,12 +756,13 @@ def get_questions(
         file_info = files[0]
         path = Path(file_info["path"])
         content = path.read_text(encoding="utf-8")
+        file_scope = file_info.get("scope", "project")
 
         # Run validation
-        validation = validate_claude_md(path)
+        validation = validate_claude_md(path, file_scope)
         sections = detect_sections(content)
         score = calculate_audit_score(
-            validation, sections
+            validation, sections, file_scope
         )
 
         # Detect project context for comparison
@@ -741,7 +770,7 @@ def get_questions(
 
         # Generate findings
         findings = generate_audit_findings(
-            path, content, validation, detected
+            path, content, validation, detected, file_scope
         )
 
         result["audit"] = {
@@ -830,18 +859,51 @@ def execute_create(
             ),
         }
 
-    # Prepare template variables
-    template_vars = {
+    # Prepare template variables. The three scopes ship templates that
+    # reference disjoint variable sets — wire each scope's expected keys
+    # explicitly so --responses content from Phase 2 actually renders.
+    template_vars: Dict[str, Any] = {
         "name": context.get("name", project_root.name),
         "description": context.get("description", ""),
-        "languages": context.get("languages", []),
-        "tools": context.get("tools", []),
-        "commands": context.get("commands", []),
-        "project_type": context.get("project_type", ""),
-        "architecture": context.get("architecture", ""),
-        "conventions": context.get("conventions", ""),
-        "constraints": context.get("constraints", ""),
     }
+
+    if scope == "user":
+        template_vars.update({
+            "preferred_languages": context.get(
+                "preferred_languages", []
+            ),
+            "preferred_tools": context.get(
+                "preferred_tools", []
+            ),
+            "default_behaviors": context.get(
+                "default_behaviors", ""
+            ),
+            "patterns": context.get("patterns", ""),
+            "tool_config": context.get("tool_config", ""),
+        })
+    elif scope == "plugin":
+        template_vars.update({
+            "plugin_type": context.get("plugin_type", ""),
+            "provides": context.get("provides", []),
+            "usage": context.get("usage", ""),
+            "config_options": context.get(
+                "config_options", ""
+            ),
+            "extension_points": context.get(
+                "extension_points", ""
+            ),
+        })
+    else:  # project (default)
+        template_vars.update({
+            "languages": context.get("languages", []),
+            "tools": context.get("tools", []),
+            "commands": context.get("commands", []),
+            "project_type": context.get("project_type", ""),
+            "architecture": context.get("architecture", ""),
+            "conventions": context.get("conventions", ""),
+            "constraints": context.get("constraints", ""),
+        })
+
     # Seed SPDX template vars (year, copyright_holder, license_id,
     # plus pre-formatted spdx_md / spdx_hash / spdx_slash blocks).
     template_vars.update(spdx_template_variables(context))
@@ -913,15 +975,17 @@ def execute_optimize(
             ),
         }
 
-    path = Path(files[0]["path"])
+    file_info = files[0]
+    path = Path(file_info["path"])
     content = path.read_text(encoding="utf-8")
+    file_scope = file_info.get("scope", "project")
 
     # Get findings
     project_root = get_project_root()
     detected = detect_project_context(project_root)
-    validation = validate_claude_md(path)
+    validation = validate_claude_md(path, file_scope)
     findings = generate_audit_findings(
-        path, content, validation, detected
+        path, content, validation, detected, file_scope
     )
 
     # Filter findings based on fix_mode
@@ -980,10 +1044,10 @@ def execute_optimize(
             }
 
     # Recalculate score
-    new_validation = validate_claude_md(path)
+    new_validation = validate_claude_md(path, file_scope)
     new_sections = detect_sections(content)
     new_score = calculate_audit_score(
-        new_validation, new_sections
+        new_validation, new_sections, file_scope
     )
 
     return {
@@ -1027,7 +1091,8 @@ def execute_validate(
 
     for file_info in files:
         path = Path(file_info["path"])
-        validation = validate_claude_md(path)
+        file_scope = file_info.get("scope", "project")
+        validation = validate_claude_md(path, file_scope)
 
         results.append({
             "name": file_info["scope"],
@@ -1071,7 +1136,8 @@ def execute_list(
     # Add validation status to each file
     for file_info in files:
         path = Path(file_info["path"])
-        validation = validate_claude_md(path)
+        file_scope = file_info.get("scope", "project")
+        validation = validate_claude_md(path, file_scope)
         file_info["valid"] = validation["valid"]
         file_info["errors"] = len(validation["errors"])
         file_info["warnings"] = len(
