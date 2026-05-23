@@ -13,6 +13,59 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.26] - 2026-05-23
+
+### Added
+
+- **Plugin dependency management foundation** (#20). New
+  `dependencies` field on `aida-config.json` lets a plugin declare
+  what other plugins (and what version ranges) it expects to be
+  present. Foundation only — install-time resolution and the
+  agent registry are deliberate follow-ups.
+- **`utils/dependencies.py`** module with three exports:
+  - `parse_version_spec(spec)` — parses bare versions plus `==`,
+    `>=`, `>`, `<=`, `<`, `^` (caret = major-compatible), and
+    `~` (tilde = minor-compatible). 1-3-part dotted-int versions
+    accepted; pre-release / build metadata not yet
+  - `version_satisfies(version, spec)` — best-effort check;
+    returns False on garbage rather than raising
+  - `check_dependencies(declared, installed)` — resolves a
+    declared dep map against the output of
+    `discover_installed_plugins()`, returning a sorted list of
+    per-dep statuses (`satisfied` / `wrong-version` / `missing`)
+- **`discover_installed_plugins()`** now surfaces each plugin's
+  `dependencies` (defaults to `{}` if the plugin hasn't declared
+  any). Other downstream skills can call
+  `utils.check_dependencies(plugin["dependencies"], installed)`
+  to get a status report
+- **Scaffolded `aida-config.json` includes the field** — every
+  new plugin lands with `"dependencies": {}` so authors have a
+  visible slot to declare deps when they need them
+- 23 new tests in `tests/unit/test_dependencies.py` covering
+  parsing (bare versions, all operators, partial versions,
+  garbage rejection), version satisfaction (each operator + caret
+  / tilde semantics + best-effort behavior on malformed input),
+  and check_dependencies (satisfied / missing / wrong-version /
+  mixed / deterministic sorting / malformed installed entries)
+
+### Notes
+
+- This is **foundation only**. The bigger #20 surface — interactive
+  install-time resolution, `/aida agents list` agent registry,
+  agent name collision detection — is deliberate follow-up work
+- The `packaging` / `semver` libraries weren't pulled in
+  intentionally. The current operator set covers the issue's
+  motivating example (`">=0.8.0"`) and the common cases. If we
+  ever need full PEP 440 / npm-style ranges, swap the internal
+  parser for `packaging.specifiers`
+- Future commands that build on this:
+  - `/aida plugin deps` — list a plugin's declared deps + status
+  - `/aida plugin install <name>` — install + resolve declared deps
+  - `/aida agents list` — unified view across plugins (also #20's
+    agent-registry piece)
+
+---
+
 ## [1.5.25] - 2026-05-23
 
 ### Added
