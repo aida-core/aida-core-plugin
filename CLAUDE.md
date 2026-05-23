@@ -1,6 +1,7 @@
 ---
 type: readme
 title: AIDA Core Plugin
+description: "AIDA Core plugin manifest for Claude Code — project layout, conventions, and development setup."
 ---
 
 <!-- SPDX-FileCopyrightText: 2026 The AIDA Core Authors -->

@@ -1,6 +1,7 @@
 ---
 type: adr
 title: "ADR-007: YAML Configuration as Single Source of Truth"
+description: ".claude/aida-project-context.yml is the single source of truth for project configuration; SKILL.md is rendered from it."
 status: accepted
 date: "2025-11-05"
 deciders:

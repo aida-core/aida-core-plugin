@@ -1,6 +1,7 @@
 ---
 type: guide
 title: "Configuration Guide"
+description: "How to configure AIDA for a project — detection flow, interactive prompts, and the generated config files."
 audience: users
 ---
 

@@ -1,6 +1,7 @@
 ---
 type: adr
 title: "ADR-005: Local-First Storage"
+description: "AIDA state lives on the user's machine (~/.claude/, .claude/); no remote or cloud storage by default."
 status: accepted
 date: "2025-11-01"
 deciders:

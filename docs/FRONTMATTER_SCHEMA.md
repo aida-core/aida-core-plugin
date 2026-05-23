@@ -46,6 +46,34 @@ The schema also constrains shapes: `name` must be kebab-case
 [`jsonschema`](https://python-jsonschema.readthedocs.io/) against
 your frontmatter to see the full validation surface.
 
+## Recommended fields
+
+JSON Schema has no native "recommended" keyword — required is
+required, everything else is optional. AIDA Core's schema uses
+per-branch `description` annotations to flag fields that are
+**strongly encouraged but not enforced**. Validators ignore them;
+humans and tooling that index frontmatter rely on them.
+
+For documentation-flavored types (`adr`, `documentation`, `guide`,
+`reference`, `readme`), **`description` is recommended** even
+though it isn't in the `required` list. Knowledge indexes, search
+listings, and routing tools all consume `description` to summarize
+a file in one line. Files without it render as vague stubs (#89).
+
+A well-formed documentation file looks like:
+
+```yaml
+---
+type: reference
+title: "Frontmatter Schema"
+description: "Reusable JSON Schema for AIDA markdown frontmatter — types, required fields, consumption guide."
+---
+```
+
+If you maintain a marketplace validator, you can warn on missing
+recommended fields without failing the check — that's the right
+posture for the current `required` / `recommended` split.
+
 ## How to consume it
 
 ### Option 1: Vendor the schema into your repo (recommended for now)

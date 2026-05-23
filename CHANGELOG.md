@@ -13,6 +13,38 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.15] - 2026-05-23
+
+### Added
+
+- **`description` is now flagged "recommended"** on
+  documentation-flavored frontmatter types (`adr`, `documentation`,
+  `guide`, `reference`, `readme`) via per-branch JSON Schema
+  `description` annotations in `.frontmatter-schema.json`. Not
+  enforced by validation — JSON Schema has no native "recommended"
+  keyword — so existing files without `description` still pass,
+  but knowledge indexes and search tooling can now read the
+  schema's intent (#89)
+- **"Recommended fields" section** in
+  `docs/FRONTMATTER_SCHEMA.md` explains the
+  required-vs-recommended split, shows the well-formed shape, and
+  gives marketplace-validator guidance ("warn, don't fail")
+- **Description fields added to 15 doc-flavored files we own**
+  (lead-by-example dogfood pass): 11 ADRs, 2 user guides,
+  `scaffolding-workflow.md`, and `CLAUDE.md`. Each gets a
+  one-sentence summary suitable for indexing
+
+### Notes
+
+- The 5 remaining files without `description` are historical
+  artifacts in `.issues/completed/` and `docs/superpowers/` —
+  left as frozen snapshots intentionally
+- Pure docs + schema-annotation change; no runtime behavior
+  changes
+- Milestone: `Config & Schema Quality`
+
+---
+
 ## [1.5.14] - 2026-05-23
 
 ### Added

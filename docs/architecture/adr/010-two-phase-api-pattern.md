@@ -1,6 +1,7 @@
 ---
 type: adr
 title: "ADR-010: Two-Phase API Pattern for LLM Integration"
+description: "Two-phase API (get_questions then execute) lets LLM orchestrators surface questions to the user between detection and action."
 status: accepted
 date: "2026-02-16"
 deciders:

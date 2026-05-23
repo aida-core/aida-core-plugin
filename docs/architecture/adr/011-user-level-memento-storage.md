@@ -1,6 +1,7 @@
 ---
 type: adr
 title: "ADR-011: User-Level Memento Storage with Project Namespacing"
+description: "Mementos live under ~/.claude/projects/<project>/memory/ with project namespacing — per-user, not per-checkout."
 status: accepted
 date: "2026-02-16"
 deciders:
