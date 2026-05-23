@@ -222,6 +222,54 @@ class TestRenderSharedFiles(unittest.TestCase):
             self.assertFalse((target / "REUSE.toml").exists())
     # REUSE-IgnoreEnd
 
+    def test_readme_has_blank_line_after_h1(self):
+        """Scaffolded README must have a blank line after the H1.
+
+        Regression for #93's README concern: `gh repo create
+        --add-readme` autogenerates a README that fails MD022 (no
+        blank between title and body). The AIDA scaffold sidesteps
+        that by writing its own README template — this test pins
+        the correct shape so future template tweaks can't collapse
+        the spacing.
+
+        Even though MD022 is now disabled in the scaffold's
+        markdownlint config (#82 / #92 / 1.5.8), the *shape* should
+        still be MD022-compliant — relaxing the rule was for tight
+        skill/agent prose, not for letting our own boilerplate get
+        ugly.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            render_shared_files(
+                target, self._build_variables(), TEMPLATES_DIR
+            )
+            lines = (target / "README.md").read_text().splitlines()
+
+            # Find the first H1 (line starting with "# ").
+            h1_index = None
+            for i, line in enumerate(lines):
+                if line.startswith("# ") and not line.startswith("## "):
+                    h1_index = i
+                    break
+
+            self.assertIsNotNone(
+                h1_index,
+                f"Scaffolded README has no H1; got: {lines!r}",
+            )
+
+            # The line immediately after the H1 must be blank.
+            self.assertLess(
+                h1_index + 1,
+                len(lines),
+                "Scaffolded README ends on the H1 — no body content",
+            )
+            self.assertEqual(
+                lines[h1_index + 1],
+                "",
+                f"Scaffolded README's line after H1 must be blank; "
+                f"got: {lines[h1_index + 1]!r}",
+            )
+
     def test_yamllint_config_ignores_node_modules(self):
         """yamllint must skip node_modules / venv / generated dirs.
 

@@ -184,6 +184,78 @@ though there's no JavaScript in the project. This is so `make lint`
 (which calls `lint-md` → `npx markdownlint-cli`) works without a
 manual install step.
 
+## Bootstrap Ordering With Branch Protection
+
+The scaffold creates a local project and (optionally) runs
+`gh repo create` to publish it. It **does not** configure branch
+protection — that's left to the user / org policy. If your project
+uses required status checks on `main`, the order of operations
+matters (#93).
+
+### The mistake to avoid
+
+If you set up branch protection with required status checks
+**before** CI has ever run, the first PR can never merge:
+
+- Branch protection demands the named checks pass
+- The named checks don't exist yet (no run on this repo)
+- "Required status check 'lint' is expected" — perpetually expected
+
+### Recommended flow
+
+```text
+1. /aida plugin scaffold ...                # local files + git init
+2. (cd into target; review files locally)
+3. gh repo create <name> --public --source=. --push
+4. Wait for the first CI run (push to main triggers it)
+5. Confirm CI is green
+6. (Optionally) gh pr create ... → first feature PR
+7. Confirm that PR's CI is green
+8. NOW enable branch protection with required status checks
+   pointing at the check names that just passed
+```
+
+Doing protect-then-bootstrap leaves the first PR stuck. Doing
+bootstrap-then-protect lets the protection rule attach to a known
+set of check names.
+
+### Why we don't automate this
+
+Branch protection is org-policy territory — every team's required
+checks, review counts, and merge strategies differ. The scaffold
+ships clean templates and an out-of-the-box-green CI workflow;
+applying protection rules on top is a separate, opinionated step.
+
+If you want a one-shot helper, the canonical `gh` recipe is:
+
+```bash
+gh api -X PUT "repos/{owner}/{repo}/branches/main/protection" \
+  --input - <<'JSON'
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": ["lint", "test"]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": null,
+  "restrictions": null
+}
+JSON
+```
+
+Run that *after* CI has passed at least once so the check names
+resolve.
+
+### README and the `--add-readme` trap
+
+`gh repo create --add-readme` autogenerates a README that fails
+`MD022` (no blank line between title and body). The AIDA scaffold
+sidesteps this by writing its own `README.md` template with proper
+heading spacing — we never call `--add-readme`. If you're combining
+scaffold output with other tooling that does, normalize the
+generated README before pushing or expect lint failures on the
+first PR.
+
 ## Error Handling
 
 | Error | Cause | Resolution |
