@@ -508,6 +508,80 @@ class TestAidaYmlRenderers(unittest.TestCase):
         self.assertIsInstance(loaded, dict)
         self.assertEqual(loaded["project"]["name"], "demo")
 
+    def test_render_aida_project_marker_omits_dead_plugin_reference(self):
+        """`aida-workflow-commands` is not a real plugin — must not appear.
+
+        Regression for #83: the renderer previously hardcoded
+        `plugins = ["aida-workflow-commands"]`, putting a dead
+        reference into every generated .claude/aida.yml.
+        """
+        import yaml
+        from configure import render_aida_project_marker
+
+        content = render_aida_project_marker(
+            preferences={}, project_name="demo"
+        )
+        self.assertNotIn("aida-workflow-commands", content)
+
+        loaded = yaml.safe_load(content)
+        # `plugins:` section may be empty (or absent) but must not
+        # contain the dead reference.
+        plugins = loaded.get("plugins") or []
+        self.assertNotIn("aida-workflow-commands", plugins)
+
+
+class TestConfigureQuestionOptions(unittest.TestCase):
+    """Guard against the #85 family: choice questions exceeding the
+    AskUserQuestion 4-option cap.
+
+    AskUserQuestion's JSON schema caps `options` at 4 items per
+    question (the user always gets a free "Other" on top of that).
+    Any choice question in configure.py that ships with > 4 options
+    is undeliverable to the user. This test scans the source and
+    asserts every choice question is within cap, so future additions
+    don't reintroduce the bug.
+    """
+
+    ASK_USER_QUESTION_OPTION_CAP = 4
+
+    def test_choice_questions_respect_option_cap(self):
+        import re
+
+        configure_path = (
+            Path(__file__).parent.parent.parent
+            / "skills"
+            / "aida"
+            / "scripts"
+            / "configure.py"
+        )
+        source = configure_path.read_text(encoding="utf-8")
+
+        # Match each question dict: capture id and the options list.
+        # Non-greedy across whitespace/lines. Tolerant of trailing
+        # comma after the closing bracket of options.
+        pattern = re.compile(
+            r'"id":\s*"(?P<id>[^"]+)"'
+            r"[\s\S]*?"
+            r'"options":\s*\[(?P<opts>[\s\S]*?)\]',
+        )
+
+        offenders = []
+        for m in pattern.finditer(source):
+            qid = m.group("id")
+            opts = re.findall(r'"([^"]+)"', m.group("opts"))
+            if len(opts) > self.ASK_USER_QUESTION_OPTION_CAP:
+                offenders.append((qid, len(opts), opts))
+
+        self.assertEqual(
+            offenders,
+            [],
+            "Choice questions exceed AskUserQuestion's 4-option cap:\n"
+            + "\n".join(
+                f"  {qid}: {n} options ({opts})"
+                for qid, n, opts in offenders
+            ),
+        )
+
 
 class TestQuestionnaire(unittest.TestCase):
     """Test questionnaire system."""
@@ -1253,6 +1327,8 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestVersion))
     suite.addTests(loader.loadTestsFromTestCase(TestPaths))
     suite.addTests(loader.loadTestsFromTestCase(TestFiles))
+    suite.addTests(loader.loadTestsFromTestCase(TestAidaYmlRenderers))
+    suite.addTests(loader.loadTestsFromTestCase(TestConfigureQuestionOptions))
     suite.addTests(loader.loadTestsFromTestCase(TestQuestionnaire))
     suite.addTests(loader.loadTestsFromTestCase(TestTemplateRendering))
     suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
