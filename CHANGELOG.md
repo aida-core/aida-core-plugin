@@ -13,6 +13,70 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.11] - 2026-05-22
+
+### Fixed
+
+- **Scaffold license prompt no longer exceeds the AskUserQuestion
+  4-option cap.** The scaffold previously offered all 6 entries in
+  `SUPPORTED_LICENSES` (MIT, Apache-2.0, ISC, GPL-3.0, AGPL-3.0,
+  UNLICENSED). AskUserQuestion caps `options` at 4 plus the
+  always-supplied "Other", so the scaffold prompt was
+  undeliverable. New curated `PROMPT_LICENSE_OPTIONS` lists the 4
+  most-common values; ISC and AGPL-3.0 remain accepted for
+  non-interactive callers. Fixes #111
+
+### Added
+
+- **"Other" SPDX id support in the scaffold.** Picking "Other" in
+  the license prompt and typing any well-formed SPDX id
+  (`MPL-2.0`, `BSD-3-Clause`, `LGPL-3.0-or-later`, `0BSD`,
+  `Unlicense`, …) now works end-to-end. The scaffold writes:
+  - A placeholder `LICENSE` at the repo root that names the SPDX id
+    and points the author at
+    `https://spdx.org/licenses/<id>.html` to paste the canonical
+    text
+  - `LICENSES/<id>.txt` (REUSE-required) with the same placeholder
+  - SPDX-License-Identifier headers in every generated file
+    referencing the chosen id
+  End-to-end verified on a `MPL-2.0` scaffold: 16/16 files clean
+  under `reuse lint`
+- `is_valid_license_id(license_id)` validator in
+  `skills/plugin-manager/scripts/operations/scaffold_ops/licenses.py`.
+  Accepts known LICENSES dict ids, NON_SPDX_PLACEHOLDERS, and any
+  string matching the loose SPDX shape `^[A-Za-z0-9.+\-]+$`.
+  Rejects empty / whitespace / shell-metacharacter ids
+- Regression tests:
+  - `tests/unit/test_scaffold_licenses.py::TestIsValidLicenseId`
+    (5 cases, including shell-metacharacter defense-in-depth)
+  - `tests/unit/test_scaffold_licenses.py::TestGetLicenseTextOther`
+    (3 cases pinning the placeholder LICENSE behavior)
+  - `tests/unit/test_scaffold.py::TestExecuteCustomLicense`
+    (end-to-end `MPL-2.0` scaffold + malformed-id rejection)
+  - `tests/unit/test_scaffold_licenses.py::test_prompt_option_cap`
+    (asserts `PROMPT_LICENSE_OPTIONS` <= 4)
+
+### Changed
+
+- `tests/unit/test_utils.py::TestConfigureQuestionOptions` now
+  scans both `configure.py` and `scaffold.py` for choice questions
+  with literal `options: [...]` lists exceeding 4 entries.
+  Single source of truth for the #85-family guard
+
+### Notes
+
+- `get_license_text` now raises `ValueError` only for *invalid*
+  ids (empty, whitespace, shell metacharacters). Previously it
+  raised for any id not in the `LICENSES` dict, which was the bug
+  this PR fixes
+- The placeholder LICENSE explicitly tells the author where to
+  fetch canonical text — better than silently writing nothing
+  (the path UNLICENSED takes is different: it gets the
+  proprietary all-rights-reserved attribution block)
+- Milestone: `Scaffold v2 — usable out of the box`
+
+---
+
 ## [1.5.10] - 2026-05-22
 
 ### Added

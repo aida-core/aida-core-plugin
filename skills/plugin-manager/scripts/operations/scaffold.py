@@ -36,7 +36,8 @@ from .scaffold_ops.context import (
 )
 from .scaffold_ops.licenses import (
     get_license_text,
-    SUPPORTED_LICENSES,
+    PROMPT_LICENSE_OPTIONS,
+    is_valid_license_id,
 )
 from .scaffold_ops.generators import (
     create_directory_structure,
@@ -136,16 +137,22 @@ def get_questions(
             }
         )
 
-    # License
+    # License. Capped at 4 mutually-exclusive named options to fit
+    # AskUserQuestion's option cap. AskUserQuestion supplies its own
+    # "Other" automatically — picking it lets the user type any SPDX
+    # id (MPL-2.0, BSD-3-Clause, LGPL-3.0-or-later, …) and the
+    # scaffold writes a placeholder LICENSE for unknown ids (#85,
+    # #111).
     if not context.get("license"):
         questions.append(
             {
                 "id": "license",
                 "question": (
-                    "Which license should the plugin use?"
+                    "Which license should the plugin use? "
+                    "Pick 'Other' to type a custom SPDX id."
                 ),
                 "type": "choice",
-                "options": SUPPORTED_LICENSES,
+                "options": PROMPT_LICENSE_OPTIONS,
                 "default": "UNLICENSED",
             }
         )
@@ -335,10 +342,14 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
         }
 
     license_id = context.get("license", "UNLICENSED")
-    if license_id not in SUPPORTED_LICENSES:
+    if not is_valid_license_id(license_id):
         return {
             "success": False,
-            "message": f"Unsupported license: {license_id}",
+            "message": (
+                f"Invalid license: {license_id!r}. Expected an "
+                f"SPDX id (e.g., 'MIT', 'MPL-2.0', 'Apache-2.0') "
+                f"or 'UNLICENSED' for proprietary projects."
+            ),
         }
 
     author_name = context.get("author_name", "")

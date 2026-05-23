@@ -536,25 +536,24 @@ class TestConfigureQuestionOptions(unittest.TestCase):
 
     AskUserQuestion's JSON schema caps `options` at 4 items per
     question (the user always gets a free "Other" on top of that).
-    Any choice question in configure.py that ships with > 4 options
-    is undeliverable to the user. This test scans the source and
-    asserts every choice question is within cap, so future additions
-    don't reintroduce the bug.
+    Any choice question in our question-emitting Python files that
+    ships with > 4 options is undeliverable to the user. This test
+    scans the source files and asserts every choice question is within
+    cap, so future additions don't reintroduce the bug.
     """
 
     ASK_USER_QUESTION_OPTION_CAP = 4
 
+    # Files we scan for question definitions. Add new ones here as
+    # they ship — anything that builds `{"id": ..., "options": [...]}`
+    # dicts is in scope.
+    QUESTION_SOURCE_FILES = (
+        ("skills", "aida", "scripts", "configure.py"),
+        ("skills", "plugin-manager", "scripts", "operations", "scaffold.py"),
+    )
+
     def test_choice_questions_respect_option_cap(self):
         import re
-
-        configure_path = (
-            Path(__file__).parent.parent.parent
-            / "skills"
-            / "aida"
-            / "scripts"
-            / "configure.py"
-        )
-        source = configure_path.read_text(encoding="utf-8")
 
         # Match each question dict: capture id and the options list.
         # Non-greedy across whitespace/lines. Tolerant of trailing
@@ -565,20 +564,38 @@ class TestConfigureQuestionOptions(unittest.TestCase):
             r'"options":\s*\[(?P<opts>[\s\S]*?)\]',
         )
 
+        # `options` can also be supplied as a bare identifier (e.g.,
+        # `options: SUPPORTED_LANGUAGES`); the static-list cap test
+        # only catches literal `[...]` definitions. That's fine —
+        # named lists like SUPPORTED_LANGUAGES are sized by separate
+        # unit tests where the constants live.
+
+        repo_root = Path(__file__).parent.parent.parent
         offenders = []
-        for m in pattern.finditer(source):
-            qid = m.group("id")
-            opts = re.findall(r'"([^"]+)"', m.group("opts"))
-            if len(opts) > self.ASK_USER_QUESTION_OPTION_CAP:
-                offenders.append((qid, len(opts), opts))
+        for parts in self.QUESTION_SOURCE_FILES:
+            source_path = repo_root.joinpath(*parts)
+            self.assertTrue(
+                source_path.exists(),
+                f"Expected question-emitting source file at "
+                f"{source_path}",
+            )
+            source = source_path.read_text(encoding="utf-8")
+
+            for m in pattern.finditer(source):
+                qid = m.group("id")
+                opts = re.findall(r'"([^"]+)"', m.group("opts"))
+                if len(opts) > self.ASK_USER_QUESTION_OPTION_CAP:
+                    offenders.append(
+                        (str(source_path), qid, len(opts), opts)
+                    )
 
         self.assertEqual(
             offenders,
             [],
             "Choice questions exceed AskUserQuestion's 4-option cap:\n"
             + "\n".join(
-                f"  {qid}: {n} options ({opts})"
-                for qid, n, opts in offenders
+                f"  {path} :: {qid}: {n} options ({opts})"
+                for path, qid, n, opts in offenders
             ),
         )
 

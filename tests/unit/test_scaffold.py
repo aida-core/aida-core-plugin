@@ -745,6 +745,97 @@ class TestExecuteWithSkillStub(unittest.TestCase):
             )
 
 
+# REUSE-IgnoreStart — this class asserts on literal SPDX-License-Identifier
+# strings inside test source; REUSE shouldn't try to parse those as real
+# expressions.
+class TestExecuteCustomLicense(unittest.TestCase):
+    """Test execute with a custom (Other) SPDX license id.
+
+    Regression for #111: previously the scaffold rejected any
+    license_id not in `SUPPORTED_LICENSES`. Users who picked "Other"
+    in the question UI and typed a real SPDX id like `MPL-2.0` or
+    `BSD-3-Clause` got `Unsupported license` and the scaffold
+    aborted. Now those ids succeed; the scaffold writes a
+    placeholder `LICENSE` referencing the SPDX list, plus the
+    correct `SPDX-License-Identifier` headers in every generated
+    file.
+    """
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_accepts_mpl_2_0(self, mock_commit, mock_git):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "mpl-plugin")
+            context = {
+                "plugin_name": "mpl-plugin",
+                "description": (
+                    "A plugin licensed under MPL-2.0 for #111"
+                ),
+                "license": "MPL-2.0",
+                "language": "python",
+                "target_directory": target,
+                "author_name": "Test Author",
+                "author_email": "test@example.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertTrue(result["success"], result.get("message"))
+
+            target_path = Path(result["path"])
+
+            # LICENSE present, mentions MPL-2.0
+            license_text = (target_path / "LICENSE").read_text()
+            self.assertIn("MPL-2.0", license_text)
+            self.assertIn("Test Author", license_text)
+            # Placeholder must point at the SPDX list so authors
+            # know how to fill in the canonical text.
+            self.assertIn("spdx.org/licenses/", license_text)
+
+            # The LICENSES/<id>.txt copy must also be written and
+            # carry the SPDX id so `reuse lint` is happy.
+            licenses_copy = (
+                target_path / "LICENSES" / "MPL-2.0.txt"
+            ).read_text()
+            self.assertIn("MPL-2.0", licenses_copy)
+
+            # SPDX headers in generated markdown must reference MPL-2.0.
+            claude_md = (target_path / "CLAUDE.md").read_text()
+            self.assertIn(
+                "SPDX-License-Identifier: MPL-2.0",
+                claude_md,
+                "CLAUDE.md should carry SPDX-License-Identifier: "
+                "MPL-2.0 header",
+            )
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_rejects_malformed_license(
+        self, mock_commit, mock_git
+    ):
+        """Defense-in-depth: shell-metachar / whitespace ids are
+        still rejected even though we accept arbitrary SPDX ids."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "evil-plugin")
+            context = {
+                "plugin_name": "evil-plugin",
+                "description": (
+                    "A plugin with a malformed license id for #111"
+                ),
+                "license": "MIT; rm -rf /",
+                "language": "python",
+                "target_directory": target,
+                "author_name": "Test Author",
+                "author_email": "test@example.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertFalse(result["success"])
+            self.assertIn("Invalid license", result["message"])
+# REUSE-IgnoreEnd
+
+
 class TestExecuteValidation(unittest.TestCase):
     """Test execute input validation."""
 
