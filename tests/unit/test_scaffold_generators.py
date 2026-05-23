@@ -133,6 +133,7 @@ class TestRenderSharedFiles(unittest.TestCase):
                 ".claude-plugin/marketplace.json",
                 ".claude-plugin/aida-config.json",
                 "CLAUDE.md",
+                "CONTRIBUTING.md",
                 "README.md",
                 ".markdownlint.json",
                 ".yamllint.yml",
@@ -263,6 +264,61 @@ class TestRenderSharedFiles(unittest.TestCase):
                     f"yamllint config must ignore {required}; "
                     f"got: {ignored}",
                 )
+
+    def test_contributing_md_documents_spdx_convention(self):
+        """CONTRIBUTING.md must teach downstream authors the SPDX
+        convention.
+
+        Regression for #100: scaffolded plugins shipped with SPDX
+        headers in every generated file (1.5.0+) but had no
+        contributor-facing docs explaining the convention. New plugin
+        authors had no way to discover that the project uses REUSE or
+        how to keep new files compliant.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            render_shared_files(
+                target, self._build_variables(), TEMPLATES_DIR
+            )
+            content = (target / "CONTRIBUTING.md").read_text()
+
+            # Must cover the three header styles a contributor needs.
+            for marker in (
+                "SPDX-FileCopyrightText",
+                "SPDX-License-Identifier",
+                "REUSE",
+                "make lint-reuse",
+                "LICENSES/",
+            ):
+                self.assertIn(
+                    marker,
+                    content,
+                    f"CONTRIBUTING.md missing required marker: "
+                    f"{marker!r}",
+                )
+
+    def test_contributing_md_omits_reuse_for_unlicensed(self):
+        """For UNLICENSED scaffolds, CONTRIBUTING.md should skip the
+        REUSE section (REUSE.toml is also omitted for the same
+        reason) and instead explain why SPDX-License-Identifier is
+        suppressed.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            variables = self._build_variables(license_id="UNLICENSED")
+            render_shared_files(target, variables, TEMPLATES_DIR)
+            content = (target / "CONTRIBUTING.md").read_text()
+
+            # No REUSE / lint-reuse content for UNLICENSED scaffolds.
+            self.assertNotIn("REUSE compliance", content)
+            self.assertNotIn("make lint-reuse", content)
+            # But SPDX copyright + the "License attribution"
+            # explanation must still be present.
+            self.assertIn("SPDX-FileCopyrightText", content)
+            self.assertIn("License attribution", content)
+            self.assertIn(
+                "UNLICENSED is not a valid SPDX identifier", content
+            )
 
     def test_markdownlint_disables_real_prose_rules(self):
         """Markdownlint must disable rules that conflict with skill /

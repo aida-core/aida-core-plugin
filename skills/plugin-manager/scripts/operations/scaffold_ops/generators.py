@@ -83,6 +83,7 @@ def render_shared_files(
             ".claude-plugin/aida-config.json"
         ),
         "shared/claude-md.jinja2": "CLAUDE.md",
+        "shared/contributing.md.jinja2": "CONTRIBUTING.md",
         "shared/readme.md.jinja2": "README.md",
         "shared/markdownlint.json.jinja2": (
             ".markdownlint.json"
