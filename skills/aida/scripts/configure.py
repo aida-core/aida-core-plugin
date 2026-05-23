@@ -282,6 +282,71 @@ def detect_vcs_info(project_root: Path) -> Dict[str, Any]:
     return vcs
 
 
+def _detect_existing_context(
+    project_root: Path,
+) -> Dict[str, str]:
+    """Detect existing project-context files (#84).
+
+    The generated project-context SKILL.md should reference rich
+    hand-written context the user has already provided rather than
+    re-claiming "no conventions documented". This helper returns a
+    flat dict of template variables that the SKILL.md template
+    consumes:
+
+      - has_claude_md: 'true' / 'false'
+      - claude_md_path: relative path to the CLAUDE.md (or '')
+      - has_knowledge_dir: 'true' / 'false'
+      - knowledge_dir: directory name like 'knowledge/' (or '')
+      - has_knowledge_index: 'true' / 'false'
+      - knowledge_index_path: relative path to the index (or '')
+
+    Search order:
+      - CLAUDE.md: project root, then .claude/CLAUDE.md
+      - knowledge index: knowledge/index.md, then
+        knowledge/README.md, then docs/index.md
+    """
+    result: Dict[str, str] = {
+        "has_claude_md": "false",
+        "claude_md_path": "",
+        "has_knowledge_dir": "false",
+        "knowledge_dir": "",
+        "has_knowledge_index": "false",
+        "knowledge_index_path": "",
+    }
+
+    claude_md_candidates = (
+        project_root / "CLAUDE.md",
+        project_root / ".claude" / "CLAUDE.md",
+    )
+    for candidate in claude_md_candidates:
+        if candidate.is_file():
+            result["has_claude_md"] = "true"
+            result["claude_md_path"] = str(
+                candidate.relative_to(project_root)
+            )
+            break
+
+    knowledge_root = project_root / "knowledge"
+    if knowledge_root.is_dir():
+        result["has_knowledge_dir"] = "true"
+        result["knowledge_dir"] = "knowledge/"
+
+    index_candidates = (
+        project_root / "knowledge" / "index.md",
+        project_root / "knowledge" / "README.md",
+        project_root / "docs" / "index.md",
+    )
+    for candidate in index_candidates:
+        if candidate.is_file():
+            result["has_knowledge_index"] = "true"
+            result["knowledge_index_path"] = str(
+                candidate.relative_to(project_root)
+            )
+            break
+
+    return result
+
+
 def detect_files(project_root: Path) -> Dict[str, bool]:
     """Detect presence of common project files.
 
@@ -974,6 +1039,13 @@ def configure(responses: Dict[str, Any], inferred: Dict[str, Any] = None) -> Dic
             # Timestamp
             'timestamp': datetime.now().isoformat(),
         }
+
+        # Existing-context detection (#84): when the project already
+        # has a CLAUDE.md / knowledge index / docs, the generated
+        # SKILL.md should reference them rather than re-claiming
+        # "no conventions documented".
+        existing_context = _detect_existing_context(project_root)
+        template_vars.update(existing_context)
 
         # Get actual README length (not hardcoded)
         if config['files']['has_readme']:

@@ -695,6 +695,92 @@ class TestDetectProjectType(unittest.TestCase):
         )
 
 
+class TestDetectExistingContext(unittest.TestCase):
+    """Test _detect_existing_context (#84).
+
+    The generated project-context SKILL.md should reference any
+    hand-written CLAUDE.md / knowledge index the user has already
+    provided rather than re-claiming "no conventions documented".
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.root = Path(self.tmp)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _detect(self):
+        from configure import _detect_existing_context
+        return _detect_existing_context(self.root)
+
+    def test_no_context_files(self):
+        """Empty project returns 'false' for everything."""
+        ctx = self._detect()
+        self.assertEqual(ctx["has_claude_md"], "false")
+        self.assertEqual(ctx["claude_md_path"], "")
+        self.assertEqual(ctx["has_knowledge_dir"], "false")
+        self.assertEqual(ctx["has_knowledge_index"], "false")
+
+    def test_root_claude_md_detected(self):
+        """Top-level CLAUDE.md is detected and path is relative."""
+        (self.root / "CLAUDE.md").write_text("# rules\n")
+        ctx = self._detect()
+        self.assertEqual(ctx["has_claude_md"], "true")
+        self.assertEqual(ctx["claude_md_path"], "CLAUDE.md")
+
+    def test_dot_claude_claude_md_detected(self):
+        """.claude/CLAUDE.md is the second-choice search path."""
+        (self.root / ".claude").mkdir()
+        (self.root / ".claude" / "CLAUDE.md").write_text("# rules\n")
+        ctx = self._detect()
+        self.assertEqual(ctx["has_claude_md"], "true")
+        self.assertEqual(
+            ctx["claude_md_path"], ".claude/CLAUDE.md"
+        )
+
+    def test_root_wins_over_dot_claude(self):
+        """If both exist, the root CLAUDE.md is reported."""
+        (self.root / "CLAUDE.md").write_text("# root\n")
+        (self.root / ".claude").mkdir()
+        (self.root / ".claude" / "CLAUDE.md").write_text("# nested\n")
+        ctx = self._detect()
+        self.assertEqual(ctx["claude_md_path"], "CLAUDE.md")
+
+    def test_knowledge_dir_and_index_detected(self):
+        """knowledge/ directory + knowledge/index.md both surface."""
+        (self.root / "knowledge").mkdir()
+        (self.root / "knowledge" / "index.md").write_text("# index\n")
+        ctx = self._detect()
+        self.assertEqual(ctx["has_knowledge_dir"], "true")
+        self.assertEqual(ctx["knowledge_dir"], "knowledge/")
+        self.assertEqual(ctx["has_knowledge_index"], "true")
+        self.assertEqual(
+            ctx["knowledge_index_path"], "knowledge/index.md"
+        )
+
+    def test_knowledge_readme_as_fallback_index(self):
+        """knowledge/README.md is accepted when index.md is absent."""
+        (self.root / "knowledge").mkdir()
+        (self.root / "knowledge" / "README.md").write_text("# r\n")
+        ctx = self._detect()
+        self.assertEqual(ctx["has_knowledge_index"], "true")
+        self.assertEqual(
+            ctx["knowledge_index_path"], "knowledge/README.md"
+        )
+
+    def test_docs_index_as_fallback(self):
+        """docs/index.md is accepted when no knowledge/ exists."""
+        (self.root / "docs").mkdir()
+        (self.root / "docs" / "index.md").write_text("# d\n")
+        ctx = self._detect()
+        self.assertEqual(ctx["has_knowledge_dir"], "false")
+        self.assertEqual(ctx["has_knowledge_index"], "true")
+        self.assertEqual(
+            ctx["knowledge_index_path"], "docs/index.md"
+        )
+
+
 class TestQuestionnaire(unittest.TestCase):
     """Test questionnaire system."""
 
@@ -1442,6 +1528,7 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestAidaYmlRenderers))
     suite.addTests(loader.loadTestsFromTestCase(TestConfigureQuestionOptions))
     suite.addTests(loader.loadTestsFromTestCase(TestDetectProjectType))
+    suite.addTests(loader.loadTestsFromTestCase(TestDetectExistingContext))
     suite.addTests(loader.loadTestsFromTestCase(TestQuestionnaire))
     suite.addTests(loader.loadTestsFromTestCase(TestTemplateRendering))
     suite.addTests(loader.loadTestsFromTestCase(TestIntegration))

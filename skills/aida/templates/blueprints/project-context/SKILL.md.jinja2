@@ -16,6 +16,13 @@ tags:
 This skill provides factual information about {{ project_name }}'s
 structure, tooling, and conventions. All information here is either
 auto-detected or explicitly configured for this project.
+{% if has_claude_md == 'true' %}
+
+> **Authoritative rules live in [`{{ claude_md_path }}`]({{ claude_md_path }}).**
+> When that file and this auto-generated skill conflict, follow the
+> CLAUDE.md. This skill summarizes detectable facts; CLAUDE.md
+> captures intent.
+{% endif %}
 
 ## Project Facts
 
@@ -233,10 +240,28 @@ Claude should:
 {% if project_conventions %}
 
 {{ project_conventions }}
+{% elif has_claude_md == 'true' %}
+
+See [`{{ claude_md_path }}`]({{ claude_md_path }}) for the project's
+hard rules and conventions. The hand-written context there takes
+precedence over anything inferred from file structure.
 {% else %}
 
 No specific conventions documented. Follow general best practices
 for {{ languages | default("this tech stack") }}.
+{% endif %}
+{% if has_knowledge_index == 'true' %}
+
+## Knowledge Index
+
+See [`{{ knowledge_index_path }}`]({{ knowledge_index_path }}) for
+the project's curated knowledge entries.
+{% elif has_knowledge_dir == 'true' %}
+
+## Knowledge Directory
+
+The project has a `{{ knowledge_dir }}` directory — browse it for
+deeper context that didn't fit into CLAUDE.md or the README.
 {% endif %}
 
 ## API Documentation

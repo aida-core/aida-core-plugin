@@ -13,6 +13,50 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.17] - 2026-05-23
+
+### Added
+
+- **Project-context SKILL.md references existing CLAUDE.md /
+  knowledge files** (#84). Previously, running `/aida config` on a
+  project with a rich hand-written `CLAUDE.md` and a `knowledge/`
+  directory still generated a SKILL.md that re-claimed "no specific
+  conventions documented" — confusing on projects where the
+  conventions were obviously written down somewhere else. Now the
+  generator detects existing context files and points at them:
+  - **CLAUDE.md callout** near the top of the rendered SKILL.md:
+    "Authoritative rules live in `<path>`. When that file and this
+    auto-generated skill conflict, follow the CLAUDE.md."
+  - **Project Conventions section** points at the CLAUDE.md when
+    `project_conventions` is otherwise empty, instead of the
+    generic fallback text
+  - **Knowledge Index / Knowledge Directory** section appears
+    when `knowledge/index.md`, `knowledge/README.md`, or
+    `docs/index.md` is detected
+- **`_detect_existing_context`** helper in `configure.py` returns
+  six new template variables (`has_claude_md`, `claude_md_path`,
+  `has_knowledge_dir`, `knowledge_dir`, `has_knowledge_index`,
+  `knowledge_index_path`). Search order: project-root CLAUDE.md
+  takes precedence over `.claude/CLAUDE.md`; knowledge/index.md
+  beats knowledge/README.md beats docs/index.md
+- Regression tests:
+  - `TestDetectExistingContext` (7 cases) in
+    `tests/unit/test_utils.py` — covers the detection precedence
+    and fallbacks
+  - `TestProjectContextReferencesExistingFiles` (6 cases) in
+    `tests/unit/test_project_context_template.py` — covers the
+    template's rendering of references and the no-CLAUDE.md
+    fallback (no regression on existing behavior)
+
+### Notes
+
+- Pairs with #86 (1.5.16) — together they make the auto-generated
+  SKILL.md actually useful instead of a noisy "Unknown / not
+  documented" stub
+- Milestone: `Config & Schema Quality` (4/6 closed after merge)
+
+---
+
 ## [1.5.16] - 2026-05-23
 
 ### Added

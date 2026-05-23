@@ -83,6 +83,15 @@ def _base_vars(**overrides: str) -> dict[str, str]:
         "code_organization": "Modular",
         "documentation_level": "Standard",
         "timestamp": "2026-01-01T00:00:00",
+        # Existing-context flags (#84). Default to 'false' / '' so
+        # the existing tests render the no-CLAUDE.md / no-knowledge
+        # branches; per-test overrides flip these on as needed.
+        "has_claude_md": "false",
+        "claude_md_path": "",
+        "has_knowledge_dir": "false",
+        "knowledge_dir": "",
+        "has_knowledge_index": "false",
+        "knowledge_index_path": "",
     }
     base.update(overrides)
     return base
@@ -223,6 +232,92 @@ class TestProjectContextTemplateWhitespace(unittest.TestCase):
                     line,
                     f"Line {i} has trailing whitespace: {line!r}",
                 )
+
+
+class TestProjectContextReferencesExistingFiles(unittest.TestCase):
+    """Test the #84 fix: template references existing CLAUDE.md /
+    knowledge files instead of claiming 'no conventions documented'.
+    """
+
+    def test_claude_md_reference_appears_at_top(self):
+        """has_claude_md=true surfaces an authoritative-rules
+        callout near the top of the rendered SKILL.md.
+        """
+        output = _render(
+            has_claude_md="true",
+            claude_md_path="CLAUDE.md",
+        )
+        self.assertIn(
+            "Authoritative rules live in [`CLAUDE.md`](CLAUDE.md)",
+            output,
+        )
+
+    def test_claude_md_referenced_in_conventions_section(self):
+        """When project_conventions is empty but a CLAUDE.md exists,
+        the Project Conventions section points at the CLAUDE.md
+        rather than re-claiming 'no specific conventions documented'.
+        """
+        output = _render(
+            has_claude_md="true",
+            claude_md_path=".claude/CLAUDE.md",
+            project_conventions="",
+        )
+        # Friendly pointer
+        self.assertIn(
+            "[`.claude/CLAUDE.md`](.claude/CLAUDE.md)", output
+        )
+        # The no-conventions fallback must NOT also appear
+        self.assertNotIn(
+            "No specific conventions documented", output
+        )
+
+    def test_conventions_fallback_when_no_claude_md(self):
+        """Without a CLAUDE.md, the existing 'no conventions
+        documented' fallback still surfaces (no regression).
+        """
+        output = _render(
+            has_claude_md="false",
+            project_conventions="",
+        )
+        self.assertIn("No specific conventions documented", output)
+
+    def test_knowledge_index_surfaces_section(self):
+        """has_knowledge_index=true renders a Knowledge Index
+        section pointing at the index file.
+        """
+        output = _render(
+            has_knowledge_dir="true",
+            knowledge_dir="knowledge/",
+            has_knowledge_index="true",
+            knowledge_index_path="knowledge/index.md",
+        )
+        self.assertIn("## Knowledge Index", output)
+        self.assertIn(
+            "[`knowledge/index.md`](knowledge/index.md)", output
+        )
+
+    def test_knowledge_dir_without_index_surfaces_directory(self):
+        """If knowledge/ exists but has no index.md / README.md,
+        the template surfaces a 'Knowledge Directory' section.
+        """
+        output = _render(
+            has_knowledge_dir="true",
+            knowledge_dir="knowledge/",
+            has_knowledge_index="false",
+        )
+        self.assertIn("## Knowledge Directory", output)
+        self.assertIn("`knowledge/`", output)
+
+    def test_no_knowledge_section_when_nothing_present(self):
+        """If neither knowledge index nor directory exists, neither
+        section renders (no empty headings).
+        """
+        output = _render(
+            has_knowledge_dir="false",
+            has_knowledge_index="false",
+        )
+        self.assertNotIn("Knowledge Index", output)
+        self.assertNotIn("Knowledge Directory", output)
 
 
 class TestSandboxedRenderer(unittest.TestCase):
