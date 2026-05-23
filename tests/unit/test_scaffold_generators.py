@@ -261,6 +261,52 @@ class TestAssembleGitignore(unittest.TestCase):
 
             self.assertNotEqual(py_content, ts_content)
 
+    def test_gitignore_does_not_blanket_ignore_claude_dir(self):
+        """Regression: gitignore must not blanket-ignore .claude/.
+
+        #95: a bare `.claude/` entry shadows the shared project config
+        that `/aida config` writes (aida.yml, aida-project-context.yml,
+        rendered project-context skill) — those are *committable*
+        team-shared state, not user-local. The convention is to ignore
+        only `.claude/settings.local.json` (Claude Code's own
+        local-overrides file).
+
+        Fixed in PR #62 (commit 48a882c). This test pins the fix so a
+        future template edit can't silently reintroduce the broad
+        pattern.
+        """
+        for lang in ("python", "typescript"):
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assemble_gitignore(target, lang, TEMPLATES_DIR)
+                content = (target / ".gitignore").read_text()
+
+                # The narrow, correct exclusion must be present.
+                self.assertIn(
+                    ".claude/settings.local.json",
+                    content,
+                    f"{lang}: gitignore must exclude "
+                    f"settings.local.json",
+                )
+
+                # The broad pattern must NOT appear as a standalone
+                # ignore line. Check line-by-line (substring would
+                # false-positive on `.claude/settings.local.json`).
+                for line in content.splitlines():
+                    stripped = line.strip()
+                    self.assertNotEqual(
+                        stripped,
+                        ".claude/",
+                        f"{lang}: gitignore has blanket '.claude/' "
+                        f"that would shadow shared project config",
+                    )
+                    self.assertNotEqual(
+                        stripped,
+                        ".claude",
+                        f"{lang}: gitignore has blanket '.claude' "
+                        f"that would shadow shared project config",
+                    )
+
 
 class TestAssembleMakefile(unittest.TestCase):
     """Test Makefile assembly."""
