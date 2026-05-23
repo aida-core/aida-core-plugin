@@ -13,6 +13,51 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.18] - 2026-05-23
+
+### Added
+
+- **`/aida config validate` command** (#87) — non-interactive
+  health check for an AIDA-configured project. Three checks:
+  - `global_install`: `~/.claude/aida.yml` exists
+  - `project_marker`: `.claude/aida.yml` exists, parses as YAML,
+    has `version` + `project` mapping
+  - `project_context`: `.claude/aida-project-context.yml` (+
+    optional `.local` overlay) parses, has the expected
+    top-level keys, and sub-sections (`vcs`, `files`,
+    `preferences`) are mappings
+
+  Exits **0 on success, 1 on failure** — CI-gateable. Pass
+  `--json` for a machine-consumable report (suitable for piping
+  into a workflow step that posts a PR comment).
+- **`skills/aida/scripts/validate.py`** — the validator
+  implementation. Uses the same `load_project_context()` loader
+  as the rest of AIDA so the validator can never disagree with
+  what consumers actually read
+- **`skills/aida/references/validate.md`** — workflow docs for
+  the new command (loaded by SKILL.md when `/aida config validate`
+  is invoked)
+- **`tests/unit/test_validate.py`** — 7 cases covering happy
+  path, each missing-file failure, malformed YAML, missing
+  expected keys, and wrong section types
+
+### Changed
+
+- `skills/aida/SKILL.md` routes `config validate` to the new
+  script, distinct from interactive `config`. The help text
+  surfaces `/aida config validate` as a separate command
+
+### Notes
+
+- Does not yet check for drift between
+  `.claude/aida-project-context.yml` and the rendered
+  `project-context/SKILL.md`. Schema-version migration also still
+  belongs to #39. Both are noted as out-of-scope follow-ups in
+  the new docs
+- Milestone: `Config & Schema Quality` (5/6 closed after merge)
+
+---
+
 ## [1.5.17] - 2026-05-23
 
 ### Added

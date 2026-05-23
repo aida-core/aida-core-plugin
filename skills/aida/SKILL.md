@@ -42,7 +42,7 @@ For `status`, `doctor`, or `upgrade` commands:
 
 ### Configuration Commands
 
-For `config` command:
+For `config` command (alone):
 
 - Read `references/config.md` for YAML-based configuration workflow
 - This is an interactive command with:
@@ -50,6 +50,14 @@ For `config` command:
   - Auto-detection of project facts (saved to YAML)
   - Minimal questions (0-3) for unknown preferences only
   - Automatic skill generation from YAML config
+
+For `config validate` command:
+
+- Read `references/validate.md` for the workflow
+- This is a **non-interactive** CI-friendly health check
+- Run `~/.aida/venv/bin/python3 {base_directory}/scripts/validate.py`
+- Exits 0 on success, 1 on failure — suitable for `make` / CI gates
+- Pass `--json` for machine-consumable output
 
 ### Permissions Commands
 
@@ -333,6 +341,7 @@ When displaying help (for `help` command or no arguments), show:
 
 ### Configuration & Setup
 - `/aida config` - Configure AIDA settings (global or project-level)
+- `/aida config validate` - Non-interactive CI-friendly health check
 - `/aida config permissions` - Configure Claude Code permissions from plugin recommendations
 - `/aida status` - Check AIDA installation and configuration status
 - `/aida doctor` - Run diagnostics to troubleshoot AIDA issues
