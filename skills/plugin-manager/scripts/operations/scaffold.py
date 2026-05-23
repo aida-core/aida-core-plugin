@@ -16,6 +16,7 @@ Usage (via manage.py):
     python manage.py --execute --context='{"operation": "scaffold", ...}'
 """
 
+import json
 import shlex
 import logging
 from datetime import datetime, timezone
@@ -30,6 +31,7 @@ from .utils import (
 )
 from .scaffold_ops.context import (
     infer_git_config,
+    is_existing_aida_plugin,
     validate_target_directory,
     check_gh_available,
     resolve_default_target,
@@ -89,6 +91,45 @@ def get_questions(
     Returns:
         Dictionary with 'questions' list and 'inferred' data
     """
+    # #110: short-circuit if the caller has explicitly pointed
+    # `target_directory` at an existing AIDA plugin. In that case
+    # the scaffold flow doesn't make sense — the directory already
+    # has a plugin. Surface a single confirmation question that
+    # offers to route into the standards-migration (update) flow
+    # instead of failing with "directory not empty".
+    target_str = context.get("target_directory")
+    if target_str:
+        target_path = Path(target_str).resolve()
+        if (
+            target_path.exists()
+            and target_path.is_dir()
+            and is_existing_aida_plugin(target_path)
+        ):
+            return {
+                "questions": [
+                    {
+                        "id": "upgrade_existing",
+                        "question": (
+                            f"Found an existing AIDA plugin at "
+                            f"{target_path}. Upgrade it to the "
+                            f"latest scaffold templates?"
+                        ),
+                        "type": "choice",
+                        "options": [
+                            "Yes, upgrade in place",
+                            "No, cancel",
+                        ],
+                        "default": "Yes, upgrade in place",
+                        "required": True,
+                    }
+                ],
+                "inferred": {
+                    "existing_plugin": True,
+                    "existing_plugin_path": str(target_path),
+                },
+                "phase": "get_questions",
+            }
+
     questions: list[dict[str, Any]] = []
     inferred: dict[str, Any] = {}
 
@@ -301,6 +342,51 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
     Returns:
         Result dictionary with success status and details
     """
+    # #110: if get_questions surfaced an existing-plugin confirmation
+    # and the user picked "upgrade", route to the standards-migration
+    # (update) flow instead of running scaffold. Importing update
+    # lazily keeps the module graph honest and avoids a circular
+    # import at module load time.
+    upgrade_answer = context.get("upgrade_existing")
+    if upgrade_answer:
+        target_str = context.get("target_directory") or context.get(
+            "existing_plugin_path"
+        )
+        if not target_str:
+            return {
+                "success": False,
+                "message": (
+                    "upgrade_existing was supplied but no "
+                    "target_directory / existing_plugin_path is "
+                    "available to route the update against"
+                ),
+            }
+        if str(upgrade_answer).startswith("No"):
+            return {
+                "success": True,
+                "message": (
+                    f"Upgrade declined; existing plugin at "
+                    f"{target_str} left untouched."
+                ),
+                "operation": "scaffold",
+                "upgrade_routed": False,
+            }
+
+        from . import update as _update_op
+
+        update_context = dict(context)
+        update_context["plugin_path"] = target_str
+        update_context["operation"] = "update"
+        result = _update_op.execute(update_context, context)
+        if isinstance(result, dict):
+            result.setdefault(
+                "message",
+                f"Upgraded existing plugin at {target_str}.",
+            )
+            result["operation"] = "scaffold"
+            result["upgrade_routed"] = True
+        return result
+
     # Validate required fields
     plugin_name = context.get("plugin_name", "")
     if not plugin_name:
@@ -503,6 +589,27 @@ def execute(context: dict[str, Any]) -> dict[str, Any]:
             )
             all_files.extend(stub_files)
 
+        # Write scaffold metadata so a future re-run (#110) or
+        # /aida plugin update can be precise about what was
+        # scaffolded — language, license, stubs, generator
+        # version. This sits next to plugin.json under
+        # .claude-plugin/ rather than mixing into plugin.json
+        # itself; the two files have orthogonal concerns.
+        _write_scaffold_metadata(
+            target,
+            plugin_name=plugin_name,
+            language=language,
+            license_id=license_id,
+            include_agent_stub=bool(
+                context.get("include_agent_stub")
+            ),
+            include_skill_stub=bool(
+                context.get("include_skill_stub")
+            ),
+            timestamp=variables["timestamp"],
+        )
+        all_files.append(".claude-plugin/aida-scaffold.json")
+
         # Initialize git
         git_initialized = initialize_git(target)
         git_committed = False
@@ -575,3 +682,83 @@ def _build_next_steps(
         )
 
     return steps
+
+
+SCAFFOLD_METADATA_RELATIVE = (
+    ".claude-plugin/aida-scaffold.json"
+)
+
+
+def _read_aida_plugin_version() -> str:
+    """Read this aida-core-plugin's own version from plugin.json.
+
+    Returns ``"unknown"`` if the manifest can't be located or
+    parsed — recorded metadata should be best-effort, never fatal.
+    """
+    plugin_json = (
+        _PROJECT_ROOT / ".claude-plugin" / "plugin.json"
+    )
+    try:
+        data = json.loads(plugin_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "unknown"
+    version = data.get("version") if isinstance(data, dict) else None
+    return str(version) if version else "unknown"
+
+
+def _write_scaffold_metadata(
+    target: Path,
+    *,
+    plugin_name: str,
+    language: str,
+    license_id: str,
+    include_agent_stub: bool,
+    include_skill_stub: bool,
+    timestamp: str,
+) -> None:
+    """Record what was scaffolded so re-runs / upgrades can be precise.
+
+    Writes ``.claude-plugin/aida-scaffold.json``. Update operations
+    read this in preference to file-presence inference so e.g. a
+    markdown-only plugin doesn't get a Python toolchain applied on
+    upgrade (#96 / #110).
+    """
+    generator_version = _read_aida_plugin_version()
+
+    metadata = {
+        "schema_version": 1,
+        "plugin_name": plugin_name,
+        "generator_version": generator_version,
+        "language": language,
+        "license_id": license_id,
+        "include_agent_stub": include_agent_stub,
+        "include_skill_stub": include_skill_stub,
+        "created_at": timestamp,
+        "last_upgraded_at": timestamp,
+    }
+
+    metadata_path = target / SCAFFOLD_METADATA_RELATIVE
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path.write_text(
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def read_scaffold_metadata(target: Path) -> dict[str, Any] | None:
+    """Read ``.claude-plugin/aida-scaffold.json`` if present.
+
+    Returns ``None`` if the file doesn't exist or fails to parse —
+    callers should fall back to file-presence inference for plugins
+    scaffolded before this metadata existed.
+    """
+    metadata_path = target / SCAFFOLD_METADATA_RELATIVE
+    if not metadata_path.exists():
+        return None
+    try:
+        data = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data

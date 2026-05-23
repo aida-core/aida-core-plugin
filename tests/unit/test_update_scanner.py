@@ -234,6 +234,79 @@ class TestDetectLanguage(unittest.TestCase):
                 _detect_language(plugin_dir), "python"
             )
 
+    def test_metadata_overrides_inference(self):
+        """`.claude-plugin/aida-scaffold.json` is preferred over
+        filesystem inference (#110).
+
+        Crucially, this lets the update flow honor `language="none"`
+        on a skills-only plugin — file-presence inference can't
+        distinguish "skills-only" from "Python" since both lack the
+        typical TS markers. Without this, `/aida plugin update` on
+        a markdown-only plugin would re-scaffold a Python toolchain
+        the author explicitly didn't want (#96).
+        """
+        import json as _json
+
+        # Plugin has pyproject.toml on disk (would infer "python"),
+        # but the recorded metadata says "none". Metadata wins.
+        with tempfile.TemporaryDirectory() as tmp:
+            plugin_dir = Path(tmp) / "skills-plugin"
+            (plugin_dir / ".claude-plugin").mkdir(parents=True)
+            (plugin_dir / "pyproject.toml").write_text("")
+            (
+                plugin_dir / ".claude-plugin" / "aida-scaffold.json"
+            ).write_text(
+                _json.dumps({
+                    "schema_version": 1,
+                    "language": "none",
+                    "license_id": "MIT",
+                })
+            )
+            self.assertEqual(
+                _detect_language(plugin_dir),
+                "none",
+                "Metadata-recorded language must take precedence "
+                "over filesystem inference",
+            )
+
+    def test_metadata_with_invalid_language_falls_back(self):
+        """If the metadata file has a language we don't recognize
+        (typo, future value, etc.), fall back to filesystem
+        inference rather than propagating an invalid value.
+        """
+        import json as _json
+
+        with tempfile.TemporaryDirectory() as tmp:
+            plugin_dir = Path(tmp) / "weird-plugin"
+            (plugin_dir / ".claude-plugin").mkdir(parents=True)
+            (plugin_dir / "package.json").write_text("{}")
+            (
+                plugin_dir / ".claude-plugin" / "aida-scaffold.json"
+            ).write_text(
+                _json.dumps({
+                    "schema_version": 1,
+                    "language": "rust",  # not in our supported set
+                })
+            )
+            self.assertEqual(
+                _detect_language(plugin_dir),
+                "typescript",  # falls back to package.json
+            )
+
+    def test_malformed_metadata_file_falls_back(self):
+        """A corrupt aida-scaffold.json must not crash detection."""
+        with tempfile.TemporaryDirectory() as tmp:
+            plugin_dir = Path(tmp) / "broken-plugin"
+            (plugin_dir / ".claude-plugin").mkdir(parents=True)
+            (plugin_dir / "scripts").mkdir()
+            (
+                plugin_dir / ".claude-plugin" / "aida-scaffold.json"
+            ).write_text("{not valid json")
+            self.assertEqual(
+                _detect_language(plugin_dir),
+                "python",  # falls back to scripts/ heuristic
+            )
+
 
 class TestScanPluginValid(unittest.TestCase):
     """Test scan_plugin with a valid plugin directory."""
