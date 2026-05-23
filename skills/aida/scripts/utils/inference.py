@@ -248,6 +248,52 @@ def detect_testing_approach(project_root: Path) -> Optional[str]:
     return None
 
 
+def _detect_language_families(project_root: Path) -> list:
+    """Detect language ecosystems present in the project (#86).
+
+    Scans for canonical manifest files and returns the set of
+    language families found. Used as a fallback when framework-
+    specific detection doesn't match a recognizable pattern.
+
+    Returns:
+        Sorted list of language family strings (deterministic
+        order for multi-language repos). Empty list if no
+        manifest files are found.
+    """
+    langs = []
+
+    # Node ecosystem: distinguish TypeScript vs JavaScript by
+    # tsconfig.json presence. Both share package.json.
+    if (project_root / "package.json").exists():
+        if (project_root / "tsconfig.json").exists():
+            langs.append("Node/TypeScript")
+        else:
+            langs.append("Node/JavaScript")
+
+    # Python: pyproject.toml is the modern marker; fall back to
+    # legacy setup.py / requirements.txt without double-counting
+    # if pyproject.toml is also present.
+    if (project_root / "pyproject.toml").exists():
+        langs.append("Python")
+    elif (
+        (project_root / "setup.py").exists()
+        or (project_root / "requirements.txt").exists()
+    ):
+        langs.append("Python")
+
+    # Other ecosystems — single canonical manifest per language
+    if (project_root / "Cargo.toml").exists():
+        langs.append("Rust")
+    if (project_root / "go.mod").exists():
+        langs.append("Go")
+    if (project_root / "Gemfile").exists():
+        langs.append("Ruby")
+    if (project_root / "composer.json").exists():
+        langs.append("PHP")
+
+    return sorted(langs)
+
+
 def detect_project_type(project_root: Path) -> Optional[str]:
     """Infer project type from structure and configuration.
 
@@ -300,6 +346,15 @@ def detect_project_type(project_root: Path) -> Optional[str]:
     # Library
     if (project_root / "setup.py").exists() or (project_root / "__init__.py").exists():
         return "Library or framework"
+
+    # Language-family fallback (#86): when no specific framework
+    # / artifact pattern matches but the project clearly uses one
+    # or more known languages, return that rather than letting
+    # the auto-generated SKILL.md claim "Unknown" on every
+    # multi-language repo.
+    langs = _detect_language_families(project_root)
+    if langs:
+        return " + ".join(langs)
 
     return None
 

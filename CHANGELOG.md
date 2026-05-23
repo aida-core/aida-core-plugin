@@ -13,6 +13,44 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.16] - 2026-05-23
+
+### Added
+
+- **Language-family fallback for `detect_project_type`** (#86).
+  When a project doesn't match any of the framework-specific
+  signatures (React / Next / Express / Django / Flask / FastAPI /
+  console_scripts / library), the inference now scans for
+  canonical manifest files and returns a useful language string:
+  - `package.json` + `tsconfig.json` → `Node/TypeScript`
+  - `package.json` (no tsconfig) → `Node/JavaScript`
+  - `pyproject.toml` → `Python` (pyproject takes precedence over
+    `setup.py` / `requirements.txt` — no double-counting)
+  - `setup.py` or `requirements.txt` (no pyproject) → `Python`
+  - `Cargo.toml` → `Rust`
+  - `go.mod` → `Go`
+  - `Gemfile` → `Ruby`
+  - `composer.json` → `PHP`
+
+  Multi-language projects return a sorted `+`-joined string (e.g.,
+  `"Node/TypeScript + Python"`), deterministic for testing.
+  Framework-specific detection still wins over language-family
+  fallback — a React project returns `"Web application
+  (frontend)"`, not `"Node/TypeScript"`. Previously these
+  multi-language repos returned `None`, which surfaced as
+  `"Unknown"` in the auto-generated SKILL.md and led to confusing
+  "Project Type: Unknown" claims on projects the author clearly
+  knew the type of
+
+### Notes
+
+- New `TestDetectProjectType` (8 cases) covers each ecosystem,
+  the multi-language repro case from #86, the empty-project None
+  return, and the framework-detection precedence
+- Milestone: `Config & Schema Quality`
+
+---
+
 ## [1.5.15] - 2026-05-23
 
 ### Added
