@@ -16,6 +16,8 @@ Usage (via manage.py):
     python manage.py --execute --context='{"operation": "scaffold", ...}'
 """
 
+from __future__ import annotations
+
 import json
 import shlex
 import logging
