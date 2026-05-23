@@ -8,6 +8,13 @@ on:
   pull_request:
     branches: [main]
 
+# Least-privilege at the workflow level. Pinning Action references
+# to commit SHAs (with version comments) means a compromised tag
+# can't ship malicious code through CI. Dependabot keeps these
+# pins fresh.
+permissions:
+  contents: read
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
@@ -16,10 +23,10 @@ jobs:
         node-version: ["{{ node_version }}"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Set up Node.js ${{ '{{' }} matrix.node-version {{ '}}' }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: ${{ '{{' }} matrix.node-version {{ '}}' }}
 
@@ -31,3 +38,9 @@ jobs:
 
       - name: Test
         run: make test
+
+      # Audit npm deps for known CVEs. `npm audit --audit-level=high`
+      # gates on high+ severity findings (moderate/low are noisy and
+      # rarely actionable in dev tooling).
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=high
