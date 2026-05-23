@@ -209,6 +209,45 @@ def render_typescript_files(
     return created
 
 
+def render_none_files(
+    target: Path,
+    variables: dict[str, Any],
+    templates_dir: Path,
+) -> list[str]:
+    """Render files for a skills-only (no toolchain) plugin.
+
+    Skills-only plugins skip every Python and TypeScript toolchain
+    artifact (no pyproject.toml, no package.json, no tests/conftest,
+    no .python-version / .nvmrc). The only language-flavored file
+    rendered here is the CI workflow, which still installs Python
+    and Node so `make lint` can run end-to-end against the
+    Markdown/YAML/REUSE checks.
+
+    Args:
+        target: Target directory path
+        variables: Template variables
+        templates_dir: Path to scaffold templates directory
+
+    Returns:
+        List of created file paths (relative to target)
+    """
+    none_templates = {
+        "none/ci.yml.jinja2": ".github/workflows/ci.yml",
+    }
+
+    created = []
+    for template_name, output_path in none_templates.items():
+        content = render_template(
+            templates_dir, template_name, variables
+        )
+        file_path = target / output_path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(content)
+        created.append(output_path)
+
+    return created
+
+
 def render_stub_agent(
     target: Path,
     name: str,
@@ -363,7 +402,9 @@ def assemble_gitignore(
 
     Args:
         target: Target directory path
-        language: "python" or "typescript"
+        language: "python", "typescript", or "none" (skills-only —
+            no language-specific fragment added; only the shared
+            patterns apply)
         templates_dir: Path to scaffold templates directory
 
     Returns:
@@ -384,13 +425,17 @@ def assemble_gitignore(
             "python/gitignore-python.jinja2",
             {},
         )
-    else:
+        parts.append(lang_content)
+    elif language == "typescript":
         lang_content = render_template(
             templates_dir,
             "typescript/gitignore-node.jinja2",
             {},
         )
-    parts.append(lang_content)
+        parts.append(lang_content)
+    # language == "none": no language-specific fragment — the
+    # shared block (OS, IDE, .claude/settings.local.json) is all a
+    # skills-only plugin needs.
 
     gitignore_path = target / ".gitignore"
     gitignore_path.write_text("\n".join(parts))
@@ -408,7 +453,9 @@ def assemble_makefile(
 
     Args:
         target: Target directory path
-        language: "python" or "typescript"
+        language: "python", "typescript", or "none" (skills-only —
+            uses a stub fragment with `lint:` aggregate but no
+            install/test targets for a language toolchain)
         variables: Template variables
         templates_dir: Path to scaffold templates directory
 
@@ -430,10 +477,16 @@ def assemble_makefile(
             "python/makefile-python.jinja2",
             variables,
         )
-    else:
+    elif language == "typescript":
         lang_targets = render_template(
             templates_dir,
             "typescript/makefile-typescript.jinja2",
+            variables,
+        )
+    else:  # "none" — skills-only plugin
+        lang_targets = render_template(
+            templates_dir,
+            "none/makefile-none.jinja2",
             variables,
         )
     parts.append(lang_targets)

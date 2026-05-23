@@ -576,6 +576,143 @@ class TestScaffoldedLintBaseline(unittest.TestCase):
             )
 
 
+class TestExecuteSkillsOnlyProject(unittest.TestCase):
+    """Test execute with language='none' (skills-only / markdown-only).
+
+    Regression for #96: scaffold previously had no skills-only flavor,
+    so plugins with no scripting (pure agents / skills / CLAUDE.md)
+    silently got a full Python toolchain that had to be manually
+    removed. language='none' is now an explicit choice; toolchain
+    files for both Python and TypeScript are skipped, leaving only
+    the shared scaffold (Makefile, CI for lint, .gitignore, REUSE
+    files, etc.).
+    """
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_creates_minimal_project(self, mock_commit, mock_git):
+        """Skills-only scaffold should create only shared + skills/
+        agents/ docs directories; no Python / TypeScript toolchain.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "skills-plugin")
+            context = {
+                "plugin_name": "skills-plugin",
+                "description": (
+                    "A skills-only plugin for #96 regression"
+                ),
+                "license": "MIT",
+                "language": "none",
+                "target_directory": target,
+                "author_name": "Test Author",
+                "author_email": "test@example.com",
+                "keywords": "skills",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertTrue(result["success"], result.get("message"))
+            self.assertEqual(result["language"], "none")
+
+            target_path = Path(result["path"])
+            # Shared files must still be present
+            for f in (
+                ".claude-plugin/plugin.json",
+                "CLAUDE.md",
+                "README.md",
+                "LICENSE",
+                "Makefile",
+                ".gitignore",
+                "CONTRIBUTING.md",
+                ".github/workflows/ci.yml",
+            ):
+                self.assertTrue(
+                    (target_path / f).exists(),
+                    f"none scaffold missing shared file: {f}",
+                )
+
+            # Python toolchain files must NOT exist
+            for forbidden in (
+                "pyproject.toml",
+                ".python-version",
+                "tests/conftest.py",
+            ):
+                self.assertFalse(
+                    (target_path / forbidden).exists(),
+                    f"none scaffold should not create {forbidden}",
+                )
+
+            # TypeScript toolchain files must NOT exist
+            for forbidden in (
+                "package.json",
+                "tsconfig.json",
+                "eslint.config.mjs",
+                ".prettierrc.json",
+                ".nvmrc",
+                "vitest.config.ts",
+            ):
+                self.assertFalse(
+                    (target_path / forbidden).exists(),
+                    f"none scaffold should not create {forbidden}",
+                )
+
+            # Per-language dirs are skipped too.
+            self.assertFalse((target_path / "tests").exists())
+            self.assertFalse((target_path / "scripts").exists())
+            self.assertFalse((target_path / "src").exists())
+
+    @patch.object(_scaffold_mod, "initialize_git", return_value=True)
+    @patch.object(_scaffold_mod, "create_initial_commit", return_value=True)
+    def test_lint_aggregate_has_no_language_targets(
+        self, mock_commit, mock_git
+    ):
+        """Skills-only Makefile's `lint:` aggregate must not reference
+        lint-py or lint-ts — those targets don't exist in this flavor.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target = str(Path(tmp) / "skills-plugin")
+            context = {
+                "plugin_name": "skills-plugin",
+                "description": (
+                    "A skills-only plugin for #96 lint-aggregate test"
+                ),
+                "license": "MIT",
+                "language": "none",
+                "target_directory": target,
+                "author_name": "Test Author",
+                "author_email": "test@example.com",
+                "keywords": "",
+                "version": "0.1.0",
+            }
+            result = execute(context)
+            self.assertTrue(result["success"], result.get("message"))
+
+            makefile = (
+                Path(result["path"]) / "Makefile"
+            ).read_text()
+
+            for line in makefile.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("lint:") and "##" in stripped:
+                    self.assertNotIn(
+                        "lint-py",
+                        stripped,
+                        "none-flavor lint: should not depend on "
+                        f"lint-py — got {stripped!r}",
+                    )
+                    self.assertNotIn(
+                        "lint-ts",
+                        stripped,
+                        "none-flavor lint: should not depend on "
+                        f"lint-ts — got {stripped!r}",
+                    )
+                    break
+            else:
+                self.fail(
+                    "Did not find a `lint:` target in skills-only "
+                    "scaffolded Makefile"
+                )
+
+
 class TestExecuteWithSkillStub(unittest.TestCase):
     """Test execute with skill stub."""
 

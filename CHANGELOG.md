@@ -13,6 +13,63 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.10] - 2026-05-22
+
+### Added
+
+- **`language=none` (skills-only / markdown-only) scaffold flavor.**
+  Previously the scaffold defaulted to Python without asking, so
+  authors of markdown-only plugins (pure agents + skills + CLAUDE.md)
+  got a full Python toolchain that had to be manually ripped out.
+  Now an explicit choice — Python / TypeScript / **None** — surfaces
+  in the wizard, and picking `none` skips every Python and
+  TypeScript toolchain artifact:
+  - No `pyproject.toml`, no `.python-version`, no `tests/conftest.py`
+  - No `package.json`, no `tsconfig.json`, no `eslint.config.mjs`,
+    no `.prettierrc.json`, no `.nvmrc`, no `vitest.config.ts`
+  - No language-specific directories (`scripts/`, `tests/`, `src/`)
+  - A minimal `Makefile` whose `lint:` aggregate covers only the
+    shared markdown / YAML / frontmatter / REUSE targets
+  - A minimal `.github/workflows/ci.yml` that installs Python +
+    Node just enough to run `reuse lint` and `markdownlint-cli`,
+    then runs `make lint`
+  - Slim `.gitignore` (shared fragment only — OS / IDE /
+    `.claude/settings.local.json`); no language patterns
+- New template directory `skills/plugin-manager/templates/scaffold/none/`
+  holding `ci.yml.jinja2` and `makefile-none.jinja2`
+- `render_none_files` generator in
+  `skills/plugin-manager/scripts/operations/scaffold_ops/generators.py`
+- Language question prompt reworded so the choice is explicit:
+  `"Which language toolchain? ('none' = skills-only, no Python or TypeScript)"`
+- `_build_next_steps` skips the `pip install` / `npm install` step
+  and the `make test` step for `none` scaffolds
+
+### Changed
+
+- `assemble_gitignore` and `assemble_makefile` switched from
+  `if/else` to `if/elif/else` so `language="none"` doesn't fall
+  through to the TypeScript fragment
+
+### Notes
+
+- End-to-end verified: scaffolded a fresh `language=none` MIT
+  plugin → 16 files created, REUSE 3.3 compliant (13/13 files);
+  none of `pyproject.toml`, `package.json`, `tsconfig.json`, or
+  the language-specific test directories are present
+- Pairs naturally with `/aida plugin update`'s skills-only path —
+  once update flows respect the recorded `language=none`
+  (tracked separately in #110's design note), the silent-Python
+  default is closed end-to-end
+- License-prompt option cap exceeded by `SUPPORTED_LICENSES`
+  (6 options vs AskUserQuestion's cap of 4) is the same #85
+  family bug in a new file — tracked in **#111**
+- Fixes #96 (language portion). The license-prompt half is split
+  out into #111 because the fix involves a separate design
+  decision (how to handle "Other" SPDX ids)
+- Milestone: `Scaffold v2 — usable out of the box`
+
+---
+
 ## [1.5.9] - 2026-05-22
 
 ### Added

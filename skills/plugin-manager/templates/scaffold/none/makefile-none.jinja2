@@ -1,0 +1,14 @@
+
+# Skills-only plugin (no Python or TypeScript toolchain)
+.PHONY: lint test install clean
+
+lint: lint-md lint-yaml lint-frontmatter lint-reuse ## Run all linters
+
+test: ## No automated tests configured (skills-only plugin)
+	@echo "No automated tests configured. Add a test target if your skills include scripts."
+
+install: ## No language deps to install (skills-only plugin)
+	@echo "No language dependencies. Markdown / YAML / skill content only."
+
+clean: ## Remove ephemeral cache files
+	find . -name ".DS_Store" -delete 2>/dev/null || true

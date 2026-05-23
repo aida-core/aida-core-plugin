@@ -1,0 +1,36 @@
+{{ spdx_hash }}
+---
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Skills-only plugins still need Python (for `reuse`) and Node
+      # (for `npx markdownlint-cli`) so `make lint` can run end-to-end.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '{{ python_version }}'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '{{ node_version }}'
+
+      - name: Install lint tools
+        run: |
+          pip install 'reuse>=4.0'
+          npm install -g markdownlint-cli@0.43.0
+
+      - name: Lint
+        run: make lint
