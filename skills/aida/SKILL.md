@@ -255,29 +255,44 @@ For `expert` commands:
 /aida expert panel remove review   → expert-registry skill
 ```
 
-### Knowledge Sync Commands
+### Knowledge Commands
 
-For `knowledge` commands:
+`/aida knowledge` commands split across two skills:
 
-- **Invoke the `knowledge-sync` skill** to handle these operations
-- Reads `agents/<agent>/knowledge/sources.yml` declarations
-- Updates marker-delimited sections in agent knowledge files
-- Phase 1: local-file sources only (web / command / api are deferred)
+- **`knowledge-sync` skill** owns the mechanic — `sync`, `status`,
+  `discover`. Deterministic: reads source declarations, fetches
+  content, walks spider roots.
+- **`knowledge-curator` skill** owns the policy workflow — `curate`,
+  `review`. LLM-orchestrated: reasons about which discovered URLs are
+  worth using and persists decisions.
 
 **Process:**
 
 1. Parse the command to extract:
-   - Operation: `sync` or `status`
-   - Argument: agent name
+   - Operation: `sync`, `status`, `discover`, `curate`, `review`
+   - Argument: agent name (and any flags)
 
-2. Invoke `knowledge-sync` skill with the parsed context. Script:
-   `~/.aida/venv/bin/python3 {base_directory}/../knowledge-sync/scripts/sync.py --agent <name> [--dry-run]`
+2. Route to the appropriate skill:
+
+| Command | Skill | Script |
+| ------- | ----- | ------ |
+| `sync <agent>` | knowledge-sync | `sync.py --agent <name>` |
+| `status <agent>` | knowledge-sync | `sync.py --agent <name> --dry-run` |
+| `discover <agent>` | knowledge-sync | `discover.py --agent <name>` |
+| `curate <agent>` | knowledge-curator | follow SKILL.md workflow |
+| `review <agent>` | knowledge-curator | follow SKILL.md workflow |
+
+Script paths are resolved as
+`~/.aida/venv/bin/python3 {base_directory}/../<skill>/scripts/<file>.py`.
 
 **Examples:**
 
 ```text
-/aida knowledge sync <agent>          → knowledge-sync skill (sync.py)
-/aida knowledge status <agent>        → knowledge-sync skill (--dry-run)
+/aida knowledge sync <agent>          → knowledge-sync (sync.py)
+/aida knowledge status <agent>        → knowledge-sync (--dry-run)
+/aida knowledge discover <agent>      → knowledge-sync (discover.py)
+/aida knowledge curate <agent>        → knowledge-curator (workflow)
+/aida knowledge review <agent>        → knowledge-curator (workflow)
 ```
 
 ### Memento Commands
@@ -399,9 +414,12 @@ When displaying help (for `help` command or no arguments), show:
 - `/aida expert panel create <name>` - Create a named expert panel
 - `/aida expert panel remove <name>` - Remove a named panel
 
-### Knowledge Sync
+### Knowledge
 - `/aida knowledge sync <agent>` - Sync an agent's knowledge from declared upstream sources
 - `/aida knowledge status <agent>` - Dry-run; report what would change
+- `/aida knowledge discover <agent>` - Spider configured roots; record new URLs as pending decisions
+- `/aida knowledge curate <agent>` - LLM workflow: decide pending URLs into in-use or rejected
+- `/aida knowledge review <agent>` - Interactive: human confirms or overrides curator decisions
 
 ### Session Persistence
 - `/aida memento create "description"` - Save current work context

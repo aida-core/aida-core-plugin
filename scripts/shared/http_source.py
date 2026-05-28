@@ -200,9 +200,20 @@ def extract_content(
     * Any other content type returns None.
     """
     ct = (content_type or "").split(";", 1)[0].strip().lower()
-    if ct in ("text/markdown", "text/plain", "text/x-markdown"):
+    if ct in (
+        "text/markdown",
+        "text/plain",
+        "text/x-markdown",
+        # XML-family content types are passed through verbatim so
+        # downstream consumers (the #144 spider parsing sitemap.xml,
+        # for instance) can parse the structure themselves.
+        "application/xml",
+        "text/xml",
+        "application/atom+xml",
+        "application/rss+xml",
+    ):
         return body
-    if ct == "text/html" or ct == "application/xhtml+xml":
+    if ct in ("text/html", "application/xhtml+xml"):
         soup = BeautifulSoup(body, "html.parser")
         if selector:
             chosen = soup.select_one(selector)
