@@ -1,7 +1,7 @@
 {
   "name": "aida-core",
   "description": "Foundation plugin for building your custom Claude Code experience. Extension scaffolding, multi-level configuration, and structured session context.",
-  "version": "1.5.30",
+  "version": "1.5.31",
   "author": {
     "name": "oakensoul",
     "email": "github@oakensoul.com"

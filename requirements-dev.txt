@@ -9,6 +9,7 @@
 # Testing
 pytest>=8.0
 pytest-cov>=4.0
+responses>=0.24    # HTTP mocking for knowledge-sync HTTP fetcher tests
 
 # Linting
 ruff>=0.4.0

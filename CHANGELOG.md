@@ -13,6 +13,93 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.31] - 2026-05-27
+
+### Added
+
+- **HTTP fetcher for knowledge-sync** (#143) — `sources.yml` now
+  supports `type: http` / `type: https` so an agent can keep its
+  knowledge files in sync with remote upstream docs (Anthropic support
+  articles, agentskills.io, project READMEs on the web, etc.). The
+  fetcher is the policy-free mechanic: it fetches a declared URL,
+  normalizes the body, and stores it in the marker-delimited section.
+  Spidering / LLM curation lives in #144
+- **`scripts/shared/http_source.py`** — `HttpFetcher`, `RateLimiter`,
+  `FetchOutcome`, `extract_content`. Pure module with no imports from
+  `bootstrap.py` or other shared modules; safe to import standalone
+- **`scripts/shared/paths.py`** — registered AIDA filesystem constants
+  (`AIDA_DIR`, `VENV_DIR`, `STAMP_FILE`, `CACHE_DIR`,
+  `KNOWLEDGE_SYNC_CACHE_DIR`). `bootstrap.py` re-exports the venv path
+  constants for backwards compatibility; new code imports from `paths`
+- **New source-result statuses:** `fetch-error` (5xx, DNS, timeout,
+  SSRF block, unsupported content-type) and `too-large` (response
+  exceeded the 2 MiB cap). `source-missing` keeps its prior meaning:
+  the upstream is definitively gone (HTTP 4xx, or local file absent)
+- **`from_cache: true` field** on per-source results when the body
+  was served entirely from the local cache without a network round
+  trip. A 304 refresh does not count as cache-only — it touched the
+  network to revalidate
+- **`/aida doctor`** now reports on the new runtime dependencies
+  (requests, beautifulsoup4, markdownify) and the
+  `~/.aida/cache/knowledge-sync/` cache directory's existence and
+  writability
+
+### Changed
+
+- `_fetch_source_body` renamed to `_dispatch_source` in
+  `skills/knowledge-sync/scripts/sync.py`. The function now returns
+  the richer `FetchOutcome` rather than `Optional[str]` so HTTP-only
+  signal (cache hit, 304, redirect-to-private, response too large,
+  etc.) isn't collapsed into a single sentinel
+- `skills/knowledge-sync/SKILL.md` description and capabilities
+  updated to reflect HTTP source support; field reference now covers
+  the new `url`, `selector`, and `cache_ttl` fields and the security
+  / caching guarantees
+
+### Security
+
+- **SSRF guard:** HTTP source URLs that resolve to private (RFC1918),
+  loopback, link-local (incl. AWS metadata at 169.254.169.254),
+  reserved, or IPv6 ULA / link-local addresses are refused before
+  connect. The check runs at every redirect hop, so a public URL that
+  302s to a private target is also blocked
+- **Redirects** follow manually (`allow_redirects=False`) and are
+  capped at 5 hops; longer chains return `fetch-error`
+- **Response size** is capped at 2 MiB via both Content-Length
+  pre-check and streamed enforcement; larger responses return
+  `too-large` without buffering the entire body
+- **Rate limit:** per-host, ≥0.5s between calls to the same hostname
+  within a sync run. Silent (no surfacing); enforced via a sliding
+  window on monotonic-clock measurements
+
+### Dependencies
+
+- `requirements.txt`: add `requests>=2.31`, `beautifulsoup4>=4.12`,
+  `markdownify>=0.11`
+- `requirements-dev.txt`: add `responses>=0.24` for HTTP mocking in
+  tests
+
+### Tests
+
+- `tests/unit/test_http_source.py` — 29 tests covering content
+  extraction (markdown / plain / HTML, selectors, fallback,
+  unsupported types), rate limiter (first-call no-wait, second-call
+  wait, per-host isolation), success paths (200 + HTML, 200 +
+  markdown, cache hit within TTL, cache_ttl=0 bypass, 304 conditional
+  refresh, redirect chain followed), failure paths (404, 503, DNS,
+  timeout, unsupported MIME), security paths (direct private IP
+  blocked, AWS metadata blocked, redirect-to-private blocked,
+  redirect chain exceeds cap, response too large via Content-Length,
+  response too large via streamed enforcement), and the FetchOutcome
+  dataclass invariants
+- `tests/unit/test_knowledge_sync_run.py` — 6 new end-to-end tests
+  for the HTTP dispatch in `run()`: happy path replaces section, 404
+  surfaces `source-missing`, 503 surfaces `fetch-error`, cache hit
+  surfaces `from_cache: true`, unknown source type surfaces
+  `fetch-error`, negative `cache_ttl` rejected
+
+---
+
 ## [1.5.30] - 2026-05-27
 
 ### Added
