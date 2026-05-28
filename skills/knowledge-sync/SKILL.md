@@ -43,16 +43,39 @@ This skill activates when:
 
 ## Operations
 
-| Operation  | Mode    | Description                                              |
-| ---------- | ------- | -------------------------------------------------------- |
-| `sync`     | Apply   | Read sources.yml, fetch, replace targeted sections       |
-| `status`   | Inspect | Dry-run the sync; report changed/unchanged/missing       |
-| `discover` | Spider  | Walk configured roots; add new URLs to decisions.json    |
+| Operation       | Mode    | Description                                                            |
+| --------------- | ------- | ---------------------------------------------------------------------- |
+| `sync`          | Apply   | Read sources.yml + in-use decisions, fetch, replace targeted sections  |
+| `status`        | Inspect | Dry-run the sync; report changed/unchanged/missing/conflict-suppressed |
+| `discover`      | Spider  | Walk configured roots; add new URLs to decisions.json                  |
+| `audit`         | Inspect | Report pending count, stale verdicts, never-synced URLs                |
+| `promote`       | Apply   | Manually mark a URL in-use (skip the LLM curator)                      |
+| `regenerate-md` | Repair  | Rebuild decisions.md from decisions.json                               |
 
 `discover` is the deterministic spider half of the curator workflow
 (#144). It walks `roots:` declared in `sources.yml`, finds candidate
 URLs, and writes them as `status: pending` into `decisions.json` for
 the `knowledge-curator` skill to verdict.
+
+`sync` reads both `sources.yml` (hand-curated entries) and
+`decisions.json` (`status: in-use` entries from the curator workflow).
+A URL listed in both `sources.yml` AND marked `rejected` in
+`decisions.json` produces a `conflict-suppressed` result so the user
+can reconcile rather than silently sync a rejected source.
+
+`audit` is a read-only report — pending count, stale LLM verdicts
+(default: older than 90 days), in-use entries that have never been
+synced, in-use entries missing `target_file` / `target_section`.
+
+`promote` is a manual override for the LLM curator. Useful when you
+already know a URL belongs in an agent's corpus — provide
+`--url <X> --file <F> --section <S>` and it lands directly as
+in-use with `decided_by: human`. Refuses to overwrite locked
+decisions.
+
+`regenerate-md` is a repair command. If a user has hand-edited
+`decisions.md` (despite the generated-file banner), this rebuilds
+it from `decisions.json` (the source of truth).
 
 ## Source declaration (`sources.yml`)
 

@@ -33,6 +33,10 @@ SCRIPT_DIR = Path(__file__).parent
 SHARED = SCRIPT_DIR.parent.parent.parent / "scripts"
 sys.path.insert(0, str(SHARED))
 
+from shared.decisions_log import (  # noqa: E402
+    Decision,
+    read_decisions,
+)
 from shared.http_source import (  # noqa: E402
     DEFAULT_CACHE_TTL,
     FetchOutcome,
@@ -201,6 +205,69 @@ def _dispatch_source(
     )
 
 
+def _materialize_decision(decision: Decision) -> Optional[Dict[str, Any]]:
+    """Turn an in-use Decision into a source-shaped dict that sync's
+    existing dispatch path can consume.
+
+    ``target_file`` is interpreted as relative to the agent's
+    ``knowledge/`` directory (matching the convention curator authors
+    use). The materialized source uses the full
+    ``knowledge/<file>`` path expected by ``_resolve_target``.
+
+    Returns None if the decision lacks the target metadata needed to
+    sync it (no target_file and no informs[0] fallback, or no
+    target_section). Callers surface those as ``invalid-target``.
+    """
+    target_file = decision.target_file or (
+        decision.informs[0] if decision.informs else None
+    )
+    if not target_file or not decision.target_section:
+        return None
+    if not target_file.startswith("knowledge/"):
+        target_file = f"knowledge/{target_file}"
+    return {
+        "name": f"decision:{decision.url}",
+        "type": "http",
+        "url": decision.url,
+        "target": {
+            "file": target_file,
+            "section": decision.target_section,
+        },
+    }
+
+
+def _detect_conflicts(
+    sources: List[Dict[str, Any]],
+    decisions: List[Decision],
+) -> Dict[str, str]:
+    """Map sources.yml URLs that conflict with the decision log to a
+    human-readable reason.
+
+    A conflict exists when sources.yml asserts a URL should be synced
+    but the decision log marks that URL ``rejected``. The user is
+    silently editing past a curator verdict; sync surfaces it so they
+    can run ``/aida knowledge review`` to override.
+    """
+    conflicts: Dict[str, str] = {}
+    by_url = {d.url: d for d in decisions}
+    for source in sources:
+        if source.get("type") not in ("http", "https"):
+            continue
+        url = source.get("url")
+        if not isinstance(url, str):
+            continue
+        decision = by_url.get(url)
+        if decision and decision.status == "rejected":
+            locked_note = " (locked)" if decision.locked else ""
+            conflicts[url] = (
+                f"URL is listed in sources.yml but decisions.json "
+                f"marks it rejected{locked_note}. Run "
+                "`/aida knowledge review <agent>` to override, or "
+                "remove the entry from sources.yml."
+            )
+    return conflicts
+
+
 def run(
     project_root: Path,
     agent: str,
@@ -208,8 +275,21 @@ def run(
 ) -> Dict[str, Any]:
     """Walk sources for ``agent`` and sync (or report) each.
 
+    Sources come from two places:
+
+      1. ``sources.yml`` — hand-curated entries (existing behavior)
+      2. ``decisions.json`` — every ``status: in-use`` decision is
+         materialized into an http source and processed alongside
+         the rest. Re-runs are idempotent because the http fetcher's
+         cache deduplicates network calls.
+
+    Conflicts (a URL listed in sources.yml that's marked ``rejected``
+    in decisions.json) surface as ``conflict-suppressed`` per-source
+    results so the user can run ``/aida knowledge review`` to
+    reconcile.
+
     Returns a structured report; never raises for per-source
-    failures — those go in the per-source `status` field.
+    failures — those go in the per-source ``status`` field.
     """
     try:
         sources = _load_sources(project_root, agent)
@@ -221,20 +301,83 @@ def run(
             "results": [],
         }
 
-    if not sources:
+    knowledge_dir = _agent_root(project_root, agent) / "knowledge"
+    try:
+        decisions = read_decisions(knowledge_dir)
+    except ValueError as exc:
+        return {
+            "success": False,
+            "agent": agent,
+            "message": (
+                f"Could not read decisions.json: {exc}"
+            ),
+            "results": [],
+        }
+
+    # Merge in-use decisions as additional http sources, skipping any
+    # URLs the user has already declared by hand in sources.yml.
+    yml_urls = {
+        s.get("url")
+        for s in sources
+        if s.get("type") in ("http", "https")
+    }
+    for decision in decisions:
+        if decision.status != "in-use":
+            continue
+        if decision.url in yml_urls:
+            continue  # sources.yml wins; explicit declaration trumps materialized
+        materialized = _materialize_decision(decision)
+        if materialized is None:
+            sources.append(
+                {
+                    "name": f"decision:{decision.url}",
+                    "type": "http",
+                    "url": decision.url,
+                    # No target — will be caught as invalid-target
+                    "_decision_missing_target": True,
+                }
+            )
+        else:
+            sources.append(materialized)
+
+    if not sources and not decisions:
         return {
             "success": True,
             "agent": agent,
             "message": (
                 f"No sources declared for agent {agent!r} "
-                "(sources.yml missing or empty)."
+                "(sources.yml missing or empty, no in-use decisions)."
             ),
             "results": [],
         }
 
+    conflicts = _detect_conflicts(sources, decisions)
+
     results: List[Dict[str, Any]] = []
     overall_ok = True
     fetcher = HttpFetcher()
+
+    # Emit conflict-suppressed entries first so they appear at the
+    # top of the report and can't be missed.
+    for url, message in conflicts.items():
+        results.append(
+            {
+                "name": f"conflict:{url}",
+                "status": "conflict-suppressed",
+                "target": None,
+                "message": message,
+            }
+        )
+        overall_ok = False
+
+    # Drop the conflicting URLs from the source list before
+    # dispatching, so we don't actually sync rejected content into
+    # the knowledge files.
+    sources = [
+        s
+        for s in sources
+        if s.get("url") not in conflicts
+    ]
 
     for source in sources:
         name = source.get("name") or source.get("type") or "<unnamed>"

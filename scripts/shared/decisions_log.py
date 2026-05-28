@@ -29,7 +29,12 @@ from typing import Any, Dict, List, Literal, Optional
 DECISIONS_JSON_FILENAME = "decisions.json"
 DECISIONS_MD_FILENAME = "decisions.md"
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
+
+# Schema versions this build accepts on read. Slice 1 shipped 1.0.0;
+# Slice 2 bumps to 1.1.0 to add target_file / target_section fields.
+# Older files load fine (the new fields just stay None).
+_ACCEPTED_VERSIONS = ("1.0.0", "1.1.0")
 
 # Two-line generated-file banner that lands at the top of every
 # regenerated decisions.md. Mirrors how AIDA already signals generated
@@ -63,6 +68,11 @@ class Decision:
     source_root: Optional[str] = None
     last_synced: Optional[str] = None
     last_etag: Optional[str] = None
+    # Schema 1.1.0+ (Slice 2): explicit sync target. When status is
+    # in-use, sync materializes an http source against these. Falls
+    # back to informs[0] (file) + url-derived slug (section) if absent.
+    target_file: Optional[str] = None
+    target_section: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a JSON-serializable dict, omitting None / empty defaults
@@ -116,10 +126,10 @@ def read_decisions(directory: Path) -> List[Decision]:
             f"decisions.json at {path} must be a JSON object."
         )
     version = data.get("version")
-    if version is not None and version != SCHEMA_VERSION:
+    if version is not None and version not in _ACCEPTED_VERSIONS:
         raise ValueError(
             f"decisions.json at {path} declares version={version!r}; "
-            f"this build understands {SCHEMA_VERSION!r}."
+            f"this build accepts {list(_ACCEPTED_VERSIONS)}."
         )
     raw_entries = data.get("decisions", [])
     if not isinstance(raw_entries, list):
@@ -153,6 +163,8 @@ def _decision_from_dict(raw: Dict[str, Any]) -> Decision:
         source_root=raw.get("source_root"),
         last_synced=raw.get("last_synced"),
         last_etag=raw.get("last_etag"),
+        target_file=raw.get("target_file"),
+        target_section=raw.get("target_section"),
     )
 
 
@@ -196,32 +208,62 @@ def _regenerate_decisions_md(
 ) -> None:
     """Render decisions.md from the JSON state.
 
-    Plain-dump format for Slice 1 — sections grouped by status, with
-    one entry per URL carrying its metadata line and reason prose if
-    present. Slice 2 may invest in richer formatting.
+    Sections grouped by status; counts in headings; locked entries
+    grouped within rejected (since locked rejections are the "do not
+    re-suggest" set). Each entry shows URL, metadata, target, reason.
     """
     in_use = [d for d in decisions if d.status == "in-use"]
-    rejected = [d for d in decisions if d.status == "rejected"]
+    rejected_locked = [
+        d for d in decisions if d.status == "rejected" and d.locked
+    ]
+    rejected_unlocked = [
+        d for d in decisions if d.status == "rejected" and not d.locked
+    ]
     pending = [d for d in decisions if d.status == "pending"]
 
     out = [_GENERATED_BANNER, "\n# Curator Decisions\n"]
+    out.append(
+        f"\n*Total: {len(decisions)} "
+        f"({len(in_use)} in-use, "
+        f"{len(rejected_locked) + len(rejected_unlocked)} rejected, "
+        f"{len(pending)} pending)*\n"
+    )
 
-    out.append("\n## In-use\n")
+    out.append(f"\n## In-use ({len(in_use)})\n")
     if in_use:
         for d in in_use:
             out.append(_render_decision(d))
     else:
         out.append("\n*No in-use decisions.*\n")
 
-    out.append("\n## Rejected\n")
-    if rejected:
-        for d in rejected:
+    out.append(
+        f"\n## Rejected ({len(rejected_locked) + len(rejected_unlocked)})\n"
+    )
+    if rejected_locked:
+        out.append(
+            f"\n### Locked rejections ({len(rejected_locked)})\n"
+        )
+        out.append(
+            "\n*These have been human-confirmed; the curator skips "
+            "them on subsequent runs.*\n"
+        )
+        for d in rejected_locked:
             out.append(_render_decision(d))
-    else:
+    if rejected_unlocked:
+        out.append(
+            f"\n### Unlocked rejections ({len(rejected_unlocked)})\n"
+        )
+        for d in rejected_unlocked:
+            out.append(_render_decision(d))
+    if not rejected_locked and not rejected_unlocked:
         out.append("\n*No rejected decisions.*\n")
 
-    out.append("\n## Pending\n")
+    out.append(f"\n## Pending ({len(pending)})\n")
     if pending:
+        out.append(
+            "\n*Awaiting verdict — run `/aida knowledge curate "
+            "<agent>` to decide.*\n"
+        )
         for d in pending:
             out.append(_render_decision(d))
     else:
@@ -233,7 +275,7 @@ def _regenerate_decisions_md(
 
 
 def _render_decision(d: Decision) -> str:
-    lines = [f"\n### {d.url}\n"]
+    lines = [f"\n#### {d.url}\n"]
     meta_bits: List[str] = []
     if d.decided_at:
         meta_bits.append(f"Decided {d.decided_at}")
@@ -243,12 +285,25 @@ def _render_decision(d: Decision) -> str:
         meta_bits.append(f"by {d.decided_by}")
     if d.locked:
         meta_bits.append("**locked**")
-    if d.informs:
-        meta_bits.append(f"Informs: {', '.join(d.informs)}")
     if d.source_root:
         meta_bits.append(f"Source root: {d.source_root}")
+    if d.last_synced:
+        meta_bits.append(f"Last synced: {d.last_synced}")
     if meta_bits:
         lines.append(f"\n*{' · '.join(meta_bits)}*\n")
+    if d.target_file or d.target_section:
+        target_file = d.target_file or (
+            d.informs[0] if d.informs else "<unset>"
+        )
+        target_section = d.target_section or "<unset>"
+        lines.append(
+            f"\n**Sync target:** "
+            f"`{target_file}` → section `{target_section}`\n"
+        )
+    elif d.informs:
+        lines.append(
+            f"\n**Informs:** {', '.join(d.informs)}\n"
+        )
     if d.reason:
         lines.append(f"\n{d.reason}\n")
     return "".join(lines)
