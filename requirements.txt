@@ -13,7 +13,7 @@ jinja2>=3.1.0
 PyYAML>=6.0
 
 # JSON Schema validation for frontmatter
-jsonschema>=4.0
+jsonschema>=4.26.0
 
 # Knowledge-sync HTTP fetcher (#143)
 requests>=2.31
