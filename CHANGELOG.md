@@ -13,6 +13,70 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.34] - 2026-05-28
+
+### Added
+
+- **`claude-code-expert` knowledge refresh** (#145) — closes the
+  agentskills.io coverage gap identified during review-skill
+  planning. The agent's knowledge now teaches the iteration loop
+  and authoring patterns the community treats as standard, plus
+  the rubric guidance the review skill's Phase 2 LLM grading will
+  consume
+- **`agents/claude-code-expert/knowledge/skill-authoring-patterns.md`**
+  — gotchas sections, calibrated control (freedom vs. prescription),
+  defaults-not-menus, procedures-over-declarations, output
+  templates, checklists, validation loops, plan-validate-execute,
+  bundling reusable scripts. AIDA-specific patterns (two-phase API,
+  atomic primitives, knowledge-with-the-agent) included at the end
+- **`agents/claude-code-expert/knowledge/skill-iteration.md`** —
+  start from real expertise (extract from a task or synthesize
+  from artifacts), refine with real execution (read execution
+  traces, not just outputs), when evals pay off, the iteration
+  loop in compressed form
+- **`agents/claude-code-expert/knowledge/evaluating-extensions.md`**
+  — narrative rubric guidance for the review skill's Phase 2 LLM
+  grading (#146). Per-type "excellent" criteria, cross-cutting
+  failure modes (semantic mismatch, overlapping knowledge, missing
+  gotchas, iteration debt), calibration notes for the A–F scale,
+  anti-patterns the LLM reviewer should avoid
+- **`agents/claude-code-expert/knowledge/sources.yml`** — `roots:`
+  configured for the agentskills.io and support.claude.com docs.
+  The agent is now a working consumer of #144's discovery +
+  curator pipeline; future refreshes can run
+  `/aida knowledge discover claude-code-expert` followed by
+  `/aida knowledge curate claude-code-expert`
+
+### Changed
+
+- **`agents/claude-code-expert/knowledge/skills.md`** — added a
+  cross-link to the new authoring-patterns and iteration files at
+  the top of the Best Practices section
+- **`agents/claude-code-expert/knowledge/framework-design-principles.md`**
+  — added an explicit note on our divergence from agentskills.io on
+  "quality belongs in agents, not skills" (we keep the line bright;
+  they don't)
+- **`agents/claude-code-expert/knowledge/index.md`** — three new
+  files registered with "when to use" entries; Quick Reference
+  table expanded with 14 new question→file mappings
+
+### Notes
+
+- The three new knowledge files are **synthesized prose**, not
+  verbatim upstream content. They adapt agentskills.io concepts to
+  AIDA's WHO/HOW/CONTEXT framework, note divergences explicitly,
+  and cross-link to existing knowledge. This is the intended shape
+  for our knowledge files — vendored upstream content with marker
+  blocks is for the rare cases where exact quotes are warranted
+- The `sources.yml` `roots:` config dogfoods #144 — the
+  claude-code-expert agent is the first consumer of the
+  discover/curate workflow. The next round of refreshes can be
+  driven by the spider rather than hand-authored
+- Unblocks #146 (review skill); the Phase 2 LLM grading now has the
+  reasoning context it needs
+
+---
+
 ## [1.5.33] - 2026-05-28
 
 ### Added

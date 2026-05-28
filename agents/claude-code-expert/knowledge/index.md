@@ -135,6 +135,56 @@ Contains:
 - Security considerations
 - Common patterns (formatting, logging, blocking, quality gates)
 
+### skill-authoring-patterns.md
+
+**When to use:** Writing a new skill body, reviewing an existing
+skill for quality, deciding how loose vs. how prescriptive a
+workflow should be
+
+Contains:
+
+- Spend the agent's context wisely (add what it lacks, omit what it
+  knows)
+- Calibrate control to task fragility (freedom vs. prescriptive)
+- Provide defaults, not menus
+- Favor procedures over declarations
+- Gotchas sections — the highest-value content in many skills
+- Output templates, checklists, validation loops, plan-validate-execute
+- Bundling reusable scripts
+- AIDA-specific patterns (two-phase API, atomic primitives, knowledge
+  with the agent)
+
+### skill-iteration.md
+
+**When to use:** Authoring a new skill, troubleshooting a skill that
+fails inconsistently, deciding whether a skill needs evals
+
+Contains:
+
+- Start from real expertise (extract from a hands-on task or
+  synthesize from project artifacts)
+- Refine with real execution (read execution traces, not just
+  outputs)
+- When evals pay off and when they're overkill
+- The iteration loop in compressed form
+- How to prompt an LLM to propose revisions
+
+### evaluating-extensions.md
+
+**When to use:** When the review skill's Phase 2 LLM grading runs;
+this is the reasoning context that informs the narrative critique
+
+Contains:
+
+- The three-phase review model (deterministic / LLM / behavioral)
+- What "excellent" looks like per extension type (agents, skills,
+  plugins)
+- Cross-cutting failure modes the LLM should catch (semantic
+  mismatch, overlapping knowledge, missing gotchas, iteration debt)
+- How to write the narrative review
+- Anti-patterns specific to LLM grading
+- Calibration notes for the A–F scale
+
 ### external-references.md
 
 **When to use:** When rebuilding or refreshing this agent's knowledge
@@ -184,6 +234,19 @@ Contains:
 | "How do I auto-format code?"                    | hooks.md                        |
 | "How do I block dangerous operations?"          | hooks.md                        |
 | "What lifecycle events exist?"                  | hooks.md                        |
+| "How do I write a good skill body?"             | skill-authoring-patterns.md     |
+| "When should the agent have freedom vs. prescription?" | skill-authoring-patterns.md |
+| "What's a gotchas section?"                     | skill-authoring-patterns.md     |
+| "Defaults vs menus?"                            | skill-authoring-patterns.md     |
+| "Procedures vs declarations?"                   | skill-authoring-patterns.md     |
+| "Plan-validate-execute pattern?"                | skill-authoring-patterns.md     |
+| "How do skills get good?"                       | skill-iteration.md              |
+| "How do I iterate on a skill?"                  | skill-iteration.md              |
+| "When should I add evals?"                      | skill-iteration.md              |
+| "How do I read execution traces?"               | skill-iteration.md              |
+| "How does the review skill grade extensions?"   | evaluating-extensions.md        |
+| "What does 'excellent' look like for X?"        | evaluating-extensions.md, framework-design-principles.md |
+| "What should the LLM reviewer catch?"           | evaluating-extensions.md        |
 
 ## External Resources
 

@@ -532,6 +532,12 @@ modifying any files.
 
 ## Best Practices
 
+> **See also:** `skill-authoring-patterns.md` for deeper authoring
+> patterns — gotchas sections, calibrated control, defaults vs.
+> menus, plan-validate-execute, output templates, validation
+> loops. And `skill-iteration.md` for the iteration loop that
+> takes a skill from "works once" to "works reliably".
+
 ### Naming
 
 - Use lowercase kebab-case: `fix-issue`, `deploy-staging`

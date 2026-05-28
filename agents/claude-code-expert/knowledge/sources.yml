@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 The AIDA Core Authors
+# SPDX-License-Identifier: MPL-2.0
+#
+# Knowledge sources for the claude-code-expert agent.
+#
+# Two top-level blocks:
+#   - roots:   Spider starting points for `/aida knowledge discover`.
+#              Walked sitemap-first; URLs that aren't already in
+#              decisions.json get added there as `status: pending`
+#              for the curator workflow.
+#   - sources: Explicit sync targets. Hand-curated entries (local
+#              files, hand-picked URLs). Sync also reads in-use
+#              entries from decisions.json and merges them with this
+#              list.
+#
+# Initial population: external-references.md lists the upstream URLs
+# the agent's knowledge derives from. The three URLs below seed the
+# spider for ongoing refreshes; once Anthropic's docs gain a sitemap
+# the recursive crawl will pull only what robots.txt permits.
+---
+version: "1.0.0"
+
+roots:
+  - url: https://agentskills.io/
+    name: agentskills
+    max_depth: 2
+    max_urls: 50
+
+  # support.claude.com is a help-center route; the spider tries the
+  # site's sitemap first. Limited depth so we don't pull marketing
+  # pages.
+  - url: https://support.claude.com/
+    name: claude-support
+    max_depth: 1
+    max_urls: 30
+
+sources: []
