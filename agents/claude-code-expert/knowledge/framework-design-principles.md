@@ -79,6 +79,16 @@ workflows with Python scripts, Jinja2 templates, and reference documentation.
 - Domain expertise ("why X is better than Y")
 - Quality judgments (that belongs in Agents)
 
+**On divergence with agentskills.io:** the broader Agent Skills
+ecosystem is looser about this line — community examples often put
+quality heuristics directly in skills (e.g., a code-review skill
+that prescribes "check for SQL injection"). We keep the line bright
+because the AIDA framework scales better when skills are reusable
+process and agents carry the domain expertise. A code-review *skill*
+should spawn a code-review *agent* whose knowledge enumerates the
+heuristics. This means our skills are more portable across domains;
+their skills are more self-contained but less composable.
+
 **Analogy:** A recipe combined with kitchen tools. The skill defines the process
 ("mix ingredients, bake at 350") and provides the automation to execute it.
 
