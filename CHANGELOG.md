@@ -13,6 +13,41 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.30] - 2026-05-27
+
+### Added
+
+- **`docs/proposals/review-skill.md`** — design doc for the
+  `/aida {agent,skill,plugin} review` skill (#146). Captures the
+  three-phase architecture (deterministic rubric + LLM expert review +
+  behavioral evals via the agentskills.io `evals/evals.json` schema),
+  A–F letter grade + 0–100 numeric mapping, Progressive Knowledge as a
+  first-class rubric category, project-configurable output formats and
+  CI threshold, rubric versioning, and the "knowledge with the agent,
+  process with the skill" separation
+- **`agents/claude-code-expert/knowledge/external-references.md`** —
+  URL ledger documenting the upstream sources the agent's knowledge
+  derives from. Lists what to consult when refreshing each knowledge
+  file. Will migrate into `sources.yml` once knowledge-sync gains HTTP
+  fetcher support (#143)
+- **`agents/claude-code-expert/knowledge/index.md`** — indexes the new
+  external-references file with a "when to use" entry
+
+### Notes
+
+- Issue chain filed for follow-up implementation:
+  - #143 — knowledge-sync HTTP fetcher (foundation)
+  - #144 — knowledge discovery + curator with decision log
+  - #145 — claude-code-expert knowledge refresh (closes agentskills.io
+    coverage gaps)
+  - #146 — review/grade skill (uses refreshed knowledge for Phase 2)
+- Per the "Knowledge with the Agent, process with the skill" principle,
+  the review skill will live in `skills/review/` with rule-based scoring
+  code, while the narrative rubric guidance the LLM uses during Phase 2
+  will live with the `claude-code-expert` agent's knowledge
+
+---
+
 ## [1.5.29] - 2026-05-23
 
 ### Added
