@@ -42,7 +42,7 @@ report.
 
 - Replace structural validation (`validate` stays as the schema-level pass/fail)
 - Run on user-level extensions in bulk mode (project-scoped only; see
-  [Bulk mode](#bulk-mode))
+  the Bulk mode section below)
 - Grade quality of the LLM model's outputs at runtime — we grade the
   *artifacts*, not the agent's responses
 

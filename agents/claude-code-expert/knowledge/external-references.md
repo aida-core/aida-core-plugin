@@ -9,7 +9,10 @@ description: External URLs the claude-code-expert agent's knowledge derives from
 
 # External References
 
-URLs the `claude-code-expert` agent should consult when rebuilding or expanding its knowledge. These are upstream sources — not pinned content. When this knowledge base is refreshed, walk this list and refresh the relevant files.
+URLs the `claude-code-expert` agent should consult when rebuilding or
+expanding its knowledge. These are upstream sources — not pinned content.
+When this knowledge base is refreshed, walk this list and refresh the
+relevant files.
 
 Once knowledge-sync gains HTTP source support (see issue tracking the
 knowledge-sync remote fetchers), these entries should migrate into
