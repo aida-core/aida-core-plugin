@@ -1,5 +1,5 @@
 ---
-type: proposal
+type: documentation
 title: "Review/Grade Skill for Plugin Extensions"
 description: "Deterministic rubric + LLM expert review, A-F letter grades, Progressive Knowledge as a first-class category. Generalizes /aida claude optimize to agents, skills, and plugins."
 status: draft

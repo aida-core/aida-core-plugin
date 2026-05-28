@@ -1,5 +1,5 @@
 ---
-type: knowledge
+type: reference
 name: external-references
 description: External URLs the claude-code-expert agent's knowledge derives from. Consult these when rebuilding or expanding the agent's knowledge files.
 ---
