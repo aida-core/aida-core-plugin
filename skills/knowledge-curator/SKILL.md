@@ -140,7 +140,7 @@ size, and one atomic write is simpler to reason about than N.
 
 Tell the user what you decided. Group by verdict:
 
-```
+```text
 Curated 12 pending URLs for agent 'claude-code-expert':
   ✓ 5 in-use (informs: skills.md, design-patterns.md)
   ✗ 7 rejected (out-of-scope / redundant)
@@ -194,7 +194,7 @@ single pass and accepts free-text per-entry input.
 Construct the new decisions list, call `write_decisions(...)`.
 Report a short summary:
 
-```
+```text
 Reviewed 12 decisions:
   3 confirmed and locked
   2 overridden (now in-use)
