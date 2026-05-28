@@ -3,12 +3,13 @@ type: skill
 name: knowledge-sync
 description: >-
   Keep agent knowledge files current with their declared upstream
-  sources. Reads agents/<name>/knowledge/sources.yml, fetches
-  each source, and updates marker-delimited sections in target
-  knowledge files. Supports local files and HTTP/HTTPS URLs.
-version: 0.2.0
+  sources. Reads agents/<name>/knowledge/sources.yml, fetches each
+  source, and updates marker-delimited sections in target knowledge
+  files. Supports local files and HTTP/HTTPS URLs, plus URL
+  discovery via the sitemap-first spider.
+version: 0.3.0
 user-invocable: true
-argument-hint: "[sync <agent>|status <agent>|status --all]"
+argument-hint: "[sync <agent>|status <agent>|discover <agent>]"
 tags:
   - core
   - management
@@ -42,15 +43,54 @@ This skill activates when:
 
 ## Operations
 
-| Operation | Mode      | Description                                       |
-| --------- | --------- | ------------------------------------------------- |
-| `sync`    | Apply     | Read sources.yml, fetch, replace targeted sections|
-| `status`  | Inspect   | Dry-run the sync; report changed/unchanged/missing|
+| Operation  | Mode    | Description                                              |
+| ---------- | ------- | -------------------------------------------------------- |
+| `sync`     | Apply   | Read sources.yml, fetch, replace targeted sections       |
+| `status`   | Inspect | Dry-run the sync; report changed/unchanged/missing       |
+| `discover` | Spider  | Walk configured roots; add new URLs to decisions.json    |
+
+`discover` is the deterministic spider half of the curator workflow
+(#144). It walks `roots:` declared in `sources.yml`, finds candidate
+URLs, and writes them as `status: pending` into `decisions.json` for
+the `knowledge-curator` skill to verdict.
 
 ## Source declaration (`sources.yml`)
 
-Lives at `agents/<agent>/knowledge/sources.yml`. A source is either a
-local file or a remote URL:
+Lives at `agents/<agent>/knowledge/sources.yml`. The file may carry
+two top-level blocks: `roots:` for the spider (#144) and `sources:`
+for explicit sync targets.
+
+### Schema version
+
+`sources.yml` includes an optional `version: "1.0.0"` field. Readers
+fall back to "1.0.0" if absent. Bump only on backwards-incompatible
+changes.
+
+### `roots:` (optional — for `/aida knowledge discover`)
+
+```yaml
+roots:
+  - url: https://agentskills.io/sitemap.xml
+    name: agentskills
+    max_depth: 3       # optional, default 3 (used only on fallback HTML crawl)
+    max_urls: 200      # optional, default 200 (truncates per-root)
+```
+
+Each root configures one origin for the spider to walk. The spider
+prefers the URL as a sitemap if it looks like one (XML extension or
+"sitemap" in the URL); otherwise it tries `/sitemap.xml` at the
+origin; otherwise it falls back to a BFS HTML crawl bounded by
+`max_depth` and `max_urls`. `robots.txt` is honored. Different roots
+walk in parallel; same-host requests serialize through the 0.5s
+per-host rate limiter.
+
+URLs found by the spider land in `decisions.json` as
+`status: pending`. The `knowledge-curator` skill turns them into
+in-use or rejected verdicts.
+
+### `sources:` — what to actively sync
+
+A source is either a local file or a remote URL:
 
 ```yaml
 sources:

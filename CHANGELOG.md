@@ -13,6 +13,112 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.32] - 2026-05-28
+
+### Added
+
+- **Knowledge discovery + curator scaffolding** (#144 Slice 1) — the
+  policy layer on top of #143's HTTP fetcher. Spiders configured
+  roots, records candidate URLs in a persisted decision log, exposes
+  a curator skill workflow that the LLM uses to verdict pending
+  URLs, and an interactive review workflow for human override. Sync
+  integration with the decision log ships in Slice 2.
+- **`scripts/shared/decisions_log.py`** — atomic decision log
+  primitives. `read_decisions` / `write_decisions` operate on a
+  `decisions.json` + `decisions.md` pair as one unit; there is no
+  exported way to write one file without regenerating the other.
+  Eliminates JSON↔MD drift by construction. `decisions.md` carries a
+  two-line generated-file banner so the file's origin is clear from
+  the first line
+- **`scripts/shared/spider.py`** — sitemap-first URL discovery
+  spider. Tries the root URL as a sitemap, then `/sitemap.xml` at
+  the origin, then falls back to a BFS HTML crawl bounded by
+  `max_depth` / `max_urls`. Honors `robots.txt`, stays inside the
+  configured origin (no cross-domain wander), reuses #143's
+  `HttpFetcher` so the SSRF guard and per-host rate limit apply.
+  Multiple roots walk in parallel via `ThreadPoolExecutor`
+- **`skills/knowledge-sync/scripts/discover.py`** — `/aida knowledge
+  discover <agent>` runner. Reads `roots:` from `sources.yml`,
+  spiders, writes any new URL as a `pending` decision into
+  `decisions.json`. Skips URLs already in the log (any status), so
+  re-runs are idempotent
+- **`skills/knowledge-curator/`** — new skill. Owns `/aida knowledge
+  curate <agent>` and `/aida knowledge review <agent>` as
+  LLM-orchestrated workflows. SKILL.md documents the policy
+  invariants (must write through `decisions_log.write_decisions`;
+  must skip `locked: true` entries; must load existing knowledge
+  heading structure before deciding so the LLM can judge
+  redundancy)
+- **`sources.yml` `roots:` block** — optional top-level list of
+  spider starting points. Per-root `max_depth` and `max_urls` caps
+  with defaults of 3 and 200
+- **`sources.yml` `version` field** — optional, aligned with
+  AIDA's existing version convention (e.g.,
+  `aida-project-context.yml`)
+- **`decisions.json` schema version "1.0.0"** — three-part semver
+  matching AIDA's pattern. Reader-side migration guard rejects
+  unknown versions with a clear error
+- **`/aida knowledge discover|curate|review` routing** in the aida
+  dispatcher
+
+### Changed
+
+- `scripts/shared/http_source.py` — XML-family content types
+  (`application/xml`, `text/xml`, `application/atom+xml`,
+  `application/rss+xml`) now pass through unprocessed. The spider's
+  sitemap parser needs raw XML; downstream consumers that want
+  markdown still get it for `text/html` sources
+- `skills/knowledge-sync/SKILL.md` — operations table gains
+  `discover`; source declaration section documents the new `roots:`
+  block, the `version:` field, and points users toward the
+  `knowledge-curator` skill for the policy half
+- `skills/aida/SKILL.md` — "Knowledge Sync Commands" section
+  renamed to "Knowledge Commands" with explicit two-skill routing
+  (`knowledge-sync` mechanic vs `knowledge-curator` policy)
+
+### Tests
+
+- 15 tests for `decisions_log` covering Decision serialization
+  defaults, atomic JSON+MD writes, schema version round-trip,
+  generated banner, status grouping in the markdown rendering,
+  malformed JSON / wrong-version / invalid-status read failures,
+  upsert / find-by-url helpers
+- 17 tests for the spider covering pure helpers (same-origin,
+  sitemap parsing, link extraction from HTML and markdown), root
+  parsing (defaults, missing fields, invalid types), sitemap-first
+  walks (direct sitemap URL, implicit sitemap.xml, max_urls
+  truncation, cross-origin filtering), recursive HTML crawl
+  fallback, robots.txt enforcement, multi-root concurrency,
+  private-IP refusal at root validation
+- 6 end-to-end tests for `discover.py` covering pending decision
+  creation, dedupe across re-runs, skip-existing semantics, no-op
+  for missing `roots:` block, no-op for missing `sources.yml`,
+  malformed roots returning a clear error
+- Full suite: 1151 passing
+
+### Notes
+
+- Out of scope for Slice 1 (lands in Slice 2 of #144):
+  - `/aida knowledge sync` extended to merge `decisions.json`
+    `in-use` entries with `sources.yml`
+  - `conflict-suppressed` status when `sources.yml` and
+    `decisions.json` disagree
+  - `/aida knowledge promote` (manual in-use without the curator)
+  - `/aida knowledge audit` (drift report)
+  - `/aida knowledge regenerate-md` (repair command for hand-edited
+    markdown)
+  - Rich `decisions.md` formatting (Slice 1 ships a plain dump)
+- The `knowledge-curator` skill's curate / review workflows are
+  LLM-orchestrated — Claude (in the user's session) does the
+  reasoning. The Python primitives (`decisions_log`, spider) handle
+  deterministic I/O. This is the "knowledge with the agent, process
+  with the skill" pattern at work — the curator's verdict on a URL
+  is a judgment call informed by the agent's knowledge corpus, so
+  the LLM owns it; the persistence is mechanical, so Python owns
+  it
+
+---
+
 ## [1.5.31] - 2026-05-27
 
 ### Added
