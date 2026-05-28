@@ -13,6 +13,77 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.33] - 2026-05-28
+
+### Added
+
+- **Knowledge sync + curator integration** (#144 Slice 2) — closes
+  the engineering loop on #144. Sync now reads both `sources.yml`
+  (hand-curated) and `decisions.json` (`status: in-use` from the
+  curator), materializing the latter into http sources at sync
+  time. Curator-decided URLs flow into knowledge files without a
+  manual `sources.yml` edit step
+- **`conflict-suppressed` per-source status** — when `sources.yml`
+  asserts a URL should sync but `decisions.json` marks it
+  `rejected`, sync emits this status with a message pointing the
+  user to `/aida knowledge review`. No silent dropping; no silent
+  syncing of rejected content
+- **`/aida knowledge promote <agent>`** — manual in-use without the
+  LLM curator. Takes `--url`, `--file`, `--section`, optional
+  `--reason`. Refuses to overwrite `locked: true` decisions
+- **`/aida knowledge audit <agent>`** — read-only health report:
+  counts by status (in-use / rejected / pending; locked subtotal),
+  stale LLM verdicts (default >90 days), in-use entries that have
+  never synced, in-use entries missing sync target metadata
+- **`/aida knowledge regenerate-md <agent>`** — repair command:
+  rebuilds `decisions.md` from `decisions.json` (the source of
+  truth) after manual edits
+
+### Changed
+
+- **`decisions.json` schema bumped to 1.1.0** — adds optional
+  `target_file` and `target_section` fields to each Decision so
+  sync's materialization can place the body into the right marker
+  block. Older 1.0.0 files load fine; in-use entries lacking the
+  new fields fall back to `informs[0]` for the file and surface as
+  `invalid-target` if no section is set
+- **Decision-log markdown rendering enriched** — per-status counts
+  in headings, locked rejections split into their own subsection
+  with explanation, sync target line per entry, "awaiting verdict"
+  note in the pending section, total count summary at the top
+- **`/aida knowledge sync` no longer fails fast on empty
+  `sources.yml`** — if `sources.yml` is missing or empty but
+  `decisions.json` has in-use entries, sync proceeds with those
+  alone
+
+### Tests
+
+- 8 tests for sync's decision-log merge behavior (in-use entries
+  flow through, pending/rejected skipped, conflict-suppressed
+  emitted on rejected URLs in sources.yml, no false conflicts when
+  in-use decisions match sources.yml entries, empty-state edge
+  cases, decisions-without-sources-yml path)
+- 12 tests for audit / promote / regenerate-md (counts by status,
+  pending URL list, stale LLM detection, never-synced flag,
+  missing-target flag, promote-new / promote-pending /
+  promote-locked-refused / promote-unlocked-rejected, regenerate
+  rebuilds md from json + handles empty-state)
+- Full suite: **1171 passing**
+
+### Notes
+
+- This closes #144. The remaining items mentioned in earlier
+  planning (project-level shared `roots:` config, JSON↔MD
+  consistency lint as a separate command, `/aida config` HTTP
+  policy block, human-string TTL formats) are out of scope and
+  will land in follow-on issues if a clear need arises
+- The "blow away `sources.yml`, decisions persist" property the
+  user wanted holds: curator-approved URLs land in
+  `decisions.json` and survive any sources.yml manipulation; sync
+  rebuilds the active set from in-use decisions on each run
+
+---
+
 ## [1.5.32] - 2026-05-28
 
 ### Added

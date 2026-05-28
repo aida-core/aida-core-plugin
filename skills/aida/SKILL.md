@@ -279,6 +279,9 @@ For `expert` commands:
 | `sync <agent>` | knowledge-sync | `sync.py --agent <name>` |
 | `status <agent>` | knowledge-sync | `sync.py --agent <name> --dry-run` |
 | `discover <agent>` | knowledge-sync | `discover.py --agent <name>` |
+| `audit <agent>` | knowledge-sync | `audit.py --agent <name>` |
+| `promote <agent> --url X --file F --section S` | knowledge-sync | `promote.py --agent <name> --url X --file F --section S` |
+| `regenerate-md <agent>` | knowledge-sync | `regenerate_md.py --agent <name>` |
 | `curate <agent>` | knowledge-curator | follow SKILL.md workflow |
 | `review <agent>` | knowledge-curator | follow SKILL.md workflow |
 
@@ -288,11 +291,14 @@ Script paths are resolved as
 **Examples:**
 
 ```text
-/aida knowledge sync <agent>          → knowledge-sync (sync.py)
-/aida knowledge status <agent>        → knowledge-sync (--dry-run)
-/aida knowledge discover <agent>      → knowledge-sync (discover.py)
-/aida knowledge curate <agent>        → knowledge-curator (workflow)
-/aida knowledge review <agent>        → knowledge-curator (workflow)
+/aida knowledge sync <agent>           → knowledge-sync (sync.py)
+/aida knowledge status <agent>         → knowledge-sync (--dry-run)
+/aida knowledge discover <agent>       → knowledge-sync (discover.py)
+/aida knowledge audit <agent>          → knowledge-sync (audit.py)
+/aida knowledge promote <agent> ...    → knowledge-sync (promote.py)
+/aida knowledge regenerate-md <agent>  → knowledge-sync (regenerate_md.py)
+/aida knowledge curate <agent>         → knowledge-curator (workflow)
+/aida knowledge review <agent>         → knowledge-curator (workflow)
 ```
 
 ### Memento Commands
@@ -415,9 +421,12 @@ When displaying help (for `help` command or no arguments), show:
 - `/aida expert panel remove <name>` - Remove a named panel
 
 ### Knowledge
-- `/aida knowledge sync <agent>` - Sync an agent's knowledge from declared upstream sources
+- `/aida knowledge sync <agent>` - Sync an agent's knowledge from declared sources + in-use decisions
 - `/aida knowledge status <agent>` - Dry-run; report what would change
 - `/aida knowledge discover <agent>` - Spider configured roots; record new URLs as pending decisions
+- `/aida knowledge audit <agent>` - Drift report (pending count, stale verdicts, never-synced URLs)
+- `/aida knowledge promote <agent> --url X --file F --section S` - Manually mark a URL in-use (skip the LLM curator)
+- `/aida knowledge regenerate-md <agent>` - Repair: rebuild decisions.md from decisions.json
 - `/aida knowledge curate <agent>` - LLM workflow: decide pending URLs into in-use or rejected
 - `/aida knowledge review <agent>` - Interactive: human confirms or overrides curator decisions
 
