@@ -135,6 +135,19 @@ Contains:
 - Security considerations
 - Common patterns (formatting, logging, blocking, quality gates)
 
+### external-references.md
+
+**When to use:** When rebuilding or refreshing this agent's knowledge
+
+Contains:
+
+- Upstream URLs that knowledge files derive from
+- Mapping of URL → which knowledge file it informs
+- Guidance for refresh workflow (walk list, update relevant files,
+  preserve local additions)
+- Source materials for the review-skill rubric and Phase 3 behavioral
+  evals design
+
 ## Quick Reference
 
 | Question                                        | Document                        |
