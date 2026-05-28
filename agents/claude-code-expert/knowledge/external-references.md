@@ -1,7 +1,9 @@
 ---
 type: reference
 name: external-references
+title: External References for claude-code-expert
 description: External URLs the claude-code-expert agent's knowledge derives from. Consult these when rebuilding or expanding the agent's knowledge files.
+version: "1.0.0"
 ---
 
 <!-- SPDX-FileCopyrightText: 2026 The AIDA Core Authors -->
