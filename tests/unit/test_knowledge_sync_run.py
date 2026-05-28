@@ -6,10 +6,14 @@
 from __future__ import annotations
 
 import shutil
+import socket
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
+
+import responses
 
 _project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(_project_root / "scripts"))
@@ -18,7 +22,13 @@ sys.path.insert(
     str(_project_root / "skills" / "knowledge-sync" / "scripts"),
 )
 
+from shared import http_source  # noqa: E402
+
 import sync as sync_mod  # noqa: E402
+
+
+def _public_getaddrinfo(host, *_a, **_kw):
+    return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("203.0.113.10", 0))]
 
 
 def _build_project(tmp: Path, *, agent: str = "demo-agent"):
@@ -182,6 +192,181 @@ class TestSyncRun(unittest.TestCase):
         self.assertEqual(
             report["results"][0]["status"], "invalid-target"
         )
+
+
+def _build_http_project(tmp: Path, *, agent: str = "http-agent"):
+    """Layout for HTTP source tests: knowledge file with marker + a
+    sources.yml pointing at a URL."""
+    proj = tmp / "proj"
+    (proj / "agents" / agent / "knowledge").mkdir(parents=True)
+
+    knowledge_path = (
+        proj / "agents" / agent / "knowledge" / "topic.md"
+    )
+    knowledge_path.write_text(
+        "# Topic\n\n"
+        '<!-- upstream:start name="remote-overview" -->\n'
+        "OLD body\n"
+        "<!-- upstream:end -->\n",
+        encoding="utf-8",
+    )
+
+    sources_yml = (
+        proj / "agents" / agent / "knowledge" / "sources.yml"
+    )
+    sources_yml.write_text(
+        "sources:\n"
+        "  - name: remote-page\n"
+        "    type: http\n"
+        "    url: https://docs.example.com/page\n"
+        "    target:\n"
+        "      file: knowledge/topic.md\n"
+        "      section: remote-overview\n",
+        encoding="utf-8",
+    )
+    return proj, knowledge_path
+
+
+class TestHttpSourceDispatch(unittest.TestCase):
+    """End-to-end coverage of the new http-type dispatch in run()."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.cache_dir = self.tmp / "cache"
+        self._cache_patch = mock.patch.object(
+            http_source, "KNOWLEDGE_SYNC_CACHE_DIR", self.cache_dir
+        )
+        self._cache_patch.start()
+
+    def tearDown(self):
+        self._cache_patch.stop()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    @responses.activate
+    def test_http_source_happy_path_replaces_section(self):
+        responses.get(
+            "https://docs.example.com/page",
+            body="# Fresh\n\nNew upstream body",
+            content_type="text/markdown",
+        )
+        proj, knowledge_path = _build_http_project(self.tmp)
+        with mock.patch.object(socket, "getaddrinfo", _public_getaddrinfo):
+            report = sync_mod.run(
+                project_root=proj, agent="http-agent", dry_run=False
+            )
+        self.assertTrue(report["success"])
+        result = report["results"][0]
+        self.assertEqual(result["status"], "changed")
+        new_content = knowledge_path.read_text(encoding="utf-8")
+        self.assertIn("Fresh", new_content)
+        self.assertNotIn("OLD body", new_content)
+
+    @responses.activate
+    def test_http_404_reports_source_missing(self):
+        responses.get("https://docs.example.com/page", status=404)
+        proj, _ = _build_http_project(self.tmp)
+        with mock.patch.object(socket, "getaddrinfo", _public_getaddrinfo):
+            report = sync_mod.run(
+                project_root=proj, agent="http-agent", dry_run=False
+            )
+        self.assertFalse(report["success"])
+        result = report["results"][0]
+        self.assertEqual(result["status"], "source-missing")
+        self.assertIn("404", result["message"])
+
+    @responses.activate
+    def test_http_500_reports_fetch_error(self):
+        responses.get("https://docs.example.com/page", status=503)
+        proj, _ = _build_http_project(self.tmp)
+        with mock.patch.object(socket, "getaddrinfo", _public_getaddrinfo):
+            report = sync_mod.run(
+                project_root=proj, agent="http-agent", dry_run=False
+            )
+        self.assertFalse(report["success"])
+        result = report["results"][0]
+        self.assertEqual(result["status"], "fetch-error")
+
+    @responses.activate
+    def test_http_cache_hit_surfaces_from_cache_flag(self):
+        responses.get(
+            "https://docs.example.com/page",
+            body="cached body",
+            content_type="text/markdown",
+        )
+        proj, _ = _build_http_project(self.tmp)
+        with mock.patch.object(socket, "getaddrinfo", _public_getaddrinfo):
+            # First run: writes cache, no from_cache flag (network)
+            first = sync_mod.run(
+                project_root=proj, agent="http-agent", dry_run=False
+            )
+            # Second run: cache hit
+            second = sync_mod.run(
+                project_root=proj, agent="http-agent", dry_run=False
+            )
+        self.assertNotIn("from_cache", first["results"][0])
+        self.assertTrue(second["results"][0].get("from_cache"))
+        # Only one network call
+        self.assertEqual(len(responses.calls), 1)
+
+    def test_unknown_source_type_reports_fetch_error(self):
+        proj = self.tmp / "proj"
+        kdir = proj / "agents" / "x" / "knowledge"
+        kdir.mkdir(parents=True)
+        (kdir / "topic.md").write_text(
+            "# T\n"
+            '<!-- upstream:start name="s" -->\n'
+            "old\n"
+            "<!-- upstream:end -->\n",
+            encoding="utf-8",
+        )
+        (kdir / "sources.yml").write_text(
+            "sources:\n"
+            "  - name: weird\n"
+            "    type: ftp\n"
+            "    target:\n"
+            "      file: knowledge/topic.md\n"
+            "      section: s\n",
+            encoding="utf-8",
+        )
+        report = sync_mod.run(
+            project_root=proj, agent="x", dry_run=False
+        )
+        self.assertFalse(report["success"])
+        self.assertEqual(
+            report["results"][0]["status"], "fetch-error"
+        )
+        self.assertIn("Unsupported source type", report["results"][0]["message"])
+
+    def test_negative_cache_ttl_rejected(self):
+        proj = self.tmp / "proj"
+        kdir = proj / "agents" / "x" / "knowledge"
+        kdir.mkdir(parents=True)
+        (kdir / "topic.md").write_text(
+            "# T\n"
+            '<!-- upstream:start name="s" -->\n'
+            "old\n"
+            "<!-- upstream:end -->\n",
+            encoding="utf-8",
+        )
+        (kdir / "sources.yml").write_text(
+            "sources:\n"
+            "  - name: bad-ttl\n"
+            "    type: http\n"
+            "    url: https://docs.example.com/page\n"
+            "    cache_ttl: -1\n"
+            "    target:\n"
+            "      file: knowledge/topic.md\n"
+            "      section: s\n",
+            encoding="utf-8",
+        )
+        report = sync_mod.run(
+            project_root=proj, agent="x", dry_run=False
+        )
+        self.assertFalse(report["success"])
+        self.assertEqual(
+            report["results"][0]["status"], "fetch-error"
+        )
+        self.assertIn("cache_ttl", report["results"][0]["message"])
 
 
 if __name__ == "__main__":

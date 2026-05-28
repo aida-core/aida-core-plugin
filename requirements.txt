@@ -14,3 +14,8 @@ PyYAML>=6.0
 
 # JSON Schema validation for frontmatter
 jsonschema>=4.0
+
+# Knowledge-sync HTTP fetcher (#143)
+requests>=2.31
+beautifulsoup4>=4.12
+markdownify>=0.11

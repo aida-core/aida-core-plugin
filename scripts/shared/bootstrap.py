@@ -26,9 +26,12 @@ from typing import Optional
 # Constants
 # ---------------------------------------------------------------------------
 
-AIDA_DIR = Path.home() / ".aida"
-VENV_DIR = AIDA_DIR / "venv"
-STAMP_FILE = AIDA_DIR / ".venv-stamp"
+from .paths import AIDA_DIR, STAMP_FILE, VENV_DIR  # noqa: E402
+
+# Re-exports kept for backwards compatibility with existing call sites that
+# import these names from `bootstrap`. The canonical definitions live in
+# `paths.py`.
+__all__ = ["AIDA_DIR", "STAMP_FILE", "VENV_DIR"]
 
 _IS_WINDOWS = platform.system() == "Windows"
 _BIN_DIR = "Scripts" if _IS_WINDOWS else "bin"

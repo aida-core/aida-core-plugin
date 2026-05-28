@@ -15,6 +15,7 @@ Exit codes:
     1 - Issues found
 """
 
+import os
 import sys
 import subprocess
 from pathlib import Path
@@ -155,7 +156,15 @@ def check_aida_venv():
         )
         if result.returncode == 0:
             installed = result.stdout
-            required = ["jinja2", "pyyaml", "jsonschema"]
+            required = [
+                "jinja2",
+                "pyyaml",
+                "jsonschema",
+                # knowledge-sync HTTP fetcher (#143)
+                "requests",
+                "beautifulsoup4",
+                "markdownify",
+            ]
             for pkg in required:
                 if pkg.lower() in installed.lower():
                     print(f"  ✓ {pkg}: installed")
@@ -163,6 +172,27 @@ def check_aida_venv():
                     print(f"  ✗ {pkg}: missing")
     except (subprocess.TimeoutExpired, subprocess.SubprocessError):
         print("  ⚠ Could not verify installed packages")
+
+    # knowledge-sync cache directory health
+    from shared.paths import KNOWLEDGE_SYNC_CACHE_DIR
+
+    if KNOWLEDGE_SYNC_CACHE_DIR.exists():
+        if os.access(KNOWLEDGE_SYNC_CACHE_DIR, os.W_OK):
+            print(
+                f"✓ Knowledge-sync cache: {KNOWLEDGE_SYNC_CACHE_DIR} "
+                "(writable)"
+            )
+        else:
+            print(
+                f"⚠ Knowledge-sync cache: {KNOWLEDGE_SYNC_CACHE_DIR} "
+                "exists but is not writable"
+            )
+    else:
+        # Not an error — created lazily on first HTTP source fetch.
+        print(
+            f"  ℹ Knowledge-sync cache will be created at "
+            f"{KNOWLEDGE_SYNC_CACHE_DIR} on first HTTP source sync"
+        )
 
     return True
 

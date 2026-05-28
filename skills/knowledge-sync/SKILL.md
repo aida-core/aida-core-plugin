@@ -5,8 +5,8 @@ description: >-
   Keep agent knowledge files current with their declared upstream
   sources. Reads agents/<name>/knowledge/sources.yml, fetches
   each source, and updates marker-delimited sections in target
-  knowledge files. Local-file sources only in Phase 1.
-version: 0.1.0
+  knowledge files. Supports local files and HTTP/HTTPS URLs.
+version: 0.2.0
 user-invocable: true
 argument-hint: "[sync <agent>|status <agent>|status --all]"
 tags:
@@ -49,29 +49,79 @@ This skill activates when:
 
 ## Source declaration (`sources.yml`)
 
-Lives at `agents/<agent>/knowledge/sources.yml`:
+Lives at `agents/<agent>/knowledge/sources.yml`. A source is either a
+local file or a remote URL:
 
 ```yaml
 sources:
+  # Local file relative to the project root
   - name: project-adrs-extension-types
     type: local
     path: docs/architecture/adr/001-skills-first-architecture.md
     target:
       file: knowledge/extension-types.md
       section: extension-types-overview
+
+  # Remote HTTP/HTTPS source
+  - name: claude-skills-overview
+    type: http
+    url: https://support.claude.com/en/articles/12512176-what-are-skills
+    selector: "main article"      # optional CSS selector
+    cache_ttl: 86400              # optional, seconds
+    target:
+      file: knowledge/skills.md
+      section: claude-skills-upstream
 ```
 
-Field reference:
+### Common fields
 
 - `name`: identifier for the source (logs / error messages use this)
-- `type`: currently only `local` — fetches a file from disk relative
-  to the project root. Future types (`web`, `command`, `api`) are on
-  the roadmap (Phase 2 of #22)
-- `path`: path to the upstream file (relative to project root)
+- `type`: `local`, `http`, or `https`
 - `target.file`: path to the knowledge file to update (relative to
   the agent's knowledge directory)
 - `target.section`: section name. The knowledge file must already
   contain `<!-- upstream:start name="<section>" -->` ... markers
+
+### `type: local`
+
+- `path`: path to the upstream file (relative to project root)
+
+### `type: http` / `type: https`
+
+- `url` (required): full URL to fetch
+- `selector` (optional): CSS selector to extract a subtree before
+  conversion. Defaults to the full document. If the selector matches
+  nothing the fetcher falls back to the full document
+- `cache_ttl` (optional): seconds before re-fetching. Default `86400`
+  (24h). `0` bypasses the cache entirely (always fetches). Negative
+  values are rejected at source load time
+
+#### Content handling
+
+- `text/markdown` and `text/plain` are passed through verbatim
+- `text/html` and `application/xhtml+xml` are converted to markdown
+  via BeautifulSoup + markdownify; the optional `selector` picks a
+  subtree first
+- Any other Content-Type is rejected as `fetch-error`
+
+#### Networking guarantees
+
+- **SSRF guard:** URLs that resolve to private (RFC1918), loopback,
+  link-local (incl. AWS metadata at 169.254.169.254), reserved, or
+  IPv6 ULA / link-local addresses are refused. The check runs at
+  every redirect hop, so a public URL that 302s to a private target
+  is also blocked
+- **Redirects** are followed manually and capped at 5 hops; chains
+  longer than that report `fetch-error`
+- **Rate limiting:** silent, in-process, per-host. Minimum 0.5s
+  between calls to the same hostname during a single sync run
+- **Response size:** capped at 2 MiB. Larger responses (declared via
+  `Content-Length` or measured during streaming) return `too-large`
+- **Cache:** responses are stored at
+  `~/.aida/cache/knowledge-sync/<sha256(url)>.json` with the fetched
+  body, ETag, and Last-Modified header. On expiry, the next fetch
+  sends conditional GET headers; a 304 refreshes the cache timestamp
+  and reuses the cached body
 
 The section markers are the single source of truth for "this content
 is replaceable by sync". Knowledge file authors decide which parts
@@ -90,24 +140,47 @@ to surface for syncing; everything else they wrote stays.
 ```
 
 Returns a JSON report (one entry per source) with each target's
-status: `unchanged` / `changed` / `missing-section` / `source-missing`.
+status:
 
-## Phase 1 scope (this release)
+| Status            | Meaning                                                     |
+| ----------------- | ----------------------------------------------------------- |
+| `unchanged`       | Section already matches the upstream body                   |
+| `changed`         | Section updated (apply mode)                                |
+| `would-change`    | Section would update (dry-run / status mode)                |
+| `source-missing`  | HTTP 4xx, or a local file that no longer exists             |
+| `fetch-error`     | HTTP 5xx, DNS / timeout / SSRF block, unsupported MIME type |
+| `too-large`       | Response body exceeded the 2 MiB cap                        |
+| `missing-section` | Knowledge file lacks the named marker block                 |
+| `target-missing`  | Knowledge file does not exist                               |
+| `invalid-target`  | Source declaration is malformed                             |
+| `marker-error`    | Markers are unbalanced inside the knowledge file            |
+| `write-error`     | Failed to write the updated knowledge file                  |
 
-- Local-file sources only (`type: local`)
+HTTP sources also include a `from_cache: true` field on the per-source
+result when the body was served entirely from cache without a network
+round-trip (a 304 refresh does not count as cache-only — it touched the
+network to revalidate).
+
+## Capabilities (this release)
+
+- Local-file sources (`type: local`)
+- HTTP / HTTPS sources (`type: http` / `https`) with SSRF guard,
+  per-host rate limit, redirect cap, response-size cap, and
+  ETag/Last-Modified caching
 - Marker-based section replacement
 - Dry-run + apply modes
-- Per-source error reporting (a missing source file doesn't crash
-  the whole sync — that source just reports `source-missing` and the
-  others continue)
+- Per-source error reporting (one bad source doesn't fail the whole
+  sync — the others continue)
 
 ## Out of scope (deferred)
 
-- Web sources (`type: web`) — fetch from URL, extract content.
-  Adding the dispatch hook for these is straightforward; the actual
-  fetcher is a follow-up
+- Spidering / URL discovery — tracked in #144
+- LLM-driven curation (decide which discovered URLs are worth using)
+  with a persisted decision log — tracked in #144
 - Command sources (`type: command`) — run a command, use stdout
 - API sources (`type: api`) — query a JSON endpoint
+- Authentication (cookies, OAuth, API keys)
+- JavaScript-rendered pages (headless browser)
 - Interactive review UX — current sync is "show diff via status,
   then apply via sync". A keep/reject-per-change wizard is a future
   enhancement

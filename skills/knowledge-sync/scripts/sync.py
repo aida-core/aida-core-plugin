@@ -33,6 +33,11 @@ SCRIPT_DIR = Path(__file__).parent
 SHARED = SCRIPT_DIR.parent.parent.parent / "scripts"
 sys.path.insert(0, str(SHARED))
 
+from shared.http_source import (  # noqa: E402
+    DEFAULT_CACHE_TTL,
+    FetchOutcome,
+    HttpFetcher,
+)
 from shared.knowledge_sync import (  # noqa: E402
     KnowledgeSyncError,
     diff_summary,
@@ -88,33 +93,112 @@ def _resolve_target(
     return _agent_root(project_root, agent) / rel
 
 
-def _fetch_source_body(
-    project_root: Path, source: Dict[str, Any]
-) -> Optional[str]:
-    """Fetch the upstream content for ``source``.
-
-    Currently only handles ``type: local``. Returns None for other
-    types or read failures — callers report ``source-missing`` for
-    those.
-
-    Normalizes the body by stripping the single trailing newline
-    that POSIX file convention adds. Without this, every sync
-    would report ``changed`` because the marker-block body has its
-    trailing newline stripped by the parser (so the body never
-    matches a file ending in \\n).
+def _normalize_body(text: Optional[str]) -> Optional[str]:
+    """Strip a single trailing newline so source-with-final-LF compares
+    equal to the LF-stripped marker body. Without this, every sync
+    would report ``changed`` because the marker-block parser strips
+    the trailing newline from its body.
     """
-    if source.get("type") != "local":
-        return None
-    path = source.get("path")
-    if not isinstance(path, str):
-        return None
-    full = project_root / path
-    text = read_local_source(str(full))
     if text is None:
         return None
-    # Strip a single trailing newline so source-with-final-LF
-    # compares equal to the LF-stripped marker body.
     return text[:-1] if text.endswith("\n") else text
+
+
+def _validate_cache_ttl(source: Dict[str, Any]) -> Optional[FetchOutcome]:
+    """Reject negative ``cache_ttl`` values at source-loading time."""
+    ttl = source.get("cache_ttl")
+    if ttl is None:
+        return None
+    if not isinstance(ttl, int) or isinstance(ttl, bool):
+        return FetchOutcome(
+            kind="fetch-error",
+            message=(
+                f"`cache_ttl` must be a non-negative integer, got "
+                f"{ttl!r}."
+            ),
+        )
+    if ttl < 0:
+        return FetchOutcome(
+            kind="fetch-error",
+            message=(
+                f"`cache_ttl` must be a non-negative integer, got {ttl}."
+            ),
+        )
+    return None
+
+
+def _dispatch_source(
+    project_root: Path,
+    source: Dict[str, Any],
+    fetcher: HttpFetcher,
+) -> FetchOutcome:
+    """Dispatch a source declaration to its fetcher and return a
+    :class:`FetchOutcome` describing the result.
+
+    Body normalization (trailing-newline strip) is applied here so
+    every dispatch path returns content shaped to compare cleanly
+    against marker-block bodies.
+    """
+    typ = source.get("type")
+
+    if typ == "local":
+        path = source.get("path")
+        if not isinstance(path, str):
+            return FetchOutcome(
+                kind="source-missing",
+                message=(
+                    "Local source missing a string `path` field."
+                ),
+            )
+        text = read_local_source(str(project_root / path))
+        if text is None:
+            return FetchOutcome(
+                kind="source-missing",
+                message=(
+                    f"Could not read local source at {path!r}."
+                ),
+            )
+        return FetchOutcome(
+            kind="content", content=_normalize_body(text)
+        )
+
+    if typ in ("http", "https"):
+        url = source.get("url")
+        if not isinstance(url, str) or not url:
+            return FetchOutcome(
+                kind="fetch-error",
+                message="HTTP source requires a string `url` field.",
+            )
+        bad_ttl = _validate_cache_ttl(source)
+        if bad_ttl is not None:
+            return bad_ttl
+        selector = source.get("selector")
+        if selector is not None and not isinstance(selector, str):
+            return FetchOutcome(
+                kind="fetch-error",
+                message="`selector` must be a string CSS selector.",
+            )
+        cache_ttl = source.get("cache_ttl")
+        if cache_ttl is None:
+            cache_ttl = DEFAULT_CACHE_TTL
+        outcome = fetcher.fetch(
+            url, selector=selector, cache_ttl=cache_ttl
+        )
+        if outcome.kind == "content":
+            return FetchOutcome(
+                kind="content",
+                content=_normalize_body(outcome.content),
+                from_cache=outcome.from_cache,
+            )
+        return outcome
+
+    return FetchOutcome(
+        kind="fetch-error",
+        message=(
+            f"Unsupported source type: {typ!r}. Supported types: "
+            "local, http, https."
+        ),
+    )
 
 
 def run(
@@ -150,6 +234,7 @@ def run(
 
     results: List[Dict[str, Any]] = []
     overall_ok = True
+    fetcher = HttpFetcher()
 
     for source in sources:
         name = source.get("name") or source.get("type") or "<unnamed>"
@@ -180,17 +265,17 @@ def run(
             results.append(result)
             continue
 
-        body = _fetch_source_body(project_root, source)
-        if body is None:
-            result["status"] = "source-missing"
-            result["message"] = (
-                f"Couldn't read upstream source for {name!r}. "
-                f"Source type: {source.get('type', '?')}, "
-                f"path: {source.get('path', '?')}"
-            )
+        outcome = _dispatch_source(project_root, source, fetcher)
+        if outcome.kind != "content":
+            result["status"] = outcome.kind
+            if outcome.message is not None:
+                result["message"] = outcome.message
             overall_ok = False
             results.append(result)
             continue
+        body = outcome.content
+        if outcome.from_cache:
+            result["from_cache"] = True
 
         if not target.is_file():
             result["status"] = "target-missing"
