@@ -2,10 +2,15 @@
 type: skill
 name: permissions
 description: >-
-  Interactive Claude Code permissions management - scans plugin
-  recommendations, presents categorized setup, and writes to
-  settings.json
+  Set up Claude Code permission rules from AIDA plugin
+  recommendations. Scans installed plugins' recommendedPermissions
+  and writes categorized allow/ask/deny rules to settings.json. Use
+  ONLY when the user runs /aida config permissions (setup or
+  --audit). Do NOT use for ad-hoc permission edits, allowing or
+  denying a single tool, or the built-in /permissions command —
+  those are handled natively by Claude Code, not by AIDA.
 version: 0.1.0
+user-invocable: false
 tags:
   - core
   - permissions

@@ -2,8 +2,14 @@
 type: skill
 name: skill-manager
 title: Skill Manager
-description: Manages Claude Code skill definitions - create, validate, version, and list skills following the Agent Skills open standard.
+description: >-
+  Create, validate, version, and list Claude Code skill definition
+  files following the Agent Skills open standard (two-phase API).
+  Use for CRUD on skill files, routed through /aida extension
+  management. Do NOT use to execute a skill's behavior — this only
+  authors and maintains skill definitions.
 version: 0.1.0
+user-invocable: false
 tags:
   - core
   - management

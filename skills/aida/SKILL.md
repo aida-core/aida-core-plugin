@@ -3,8 +3,11 @@ type: skill
 name: aida
 description: This skill routes /aida commands to appropriate handlers - configuration,
   diagnostics, feedback, extension management (agent-manager, skill-manager,
-  plugin-manager, hook-manager, claude-md-manager), and session persistence
-  (memento).
+  plugin-manager, hook-manager, claude-md-manager, permissions), expert and
+  panel configuration (expert-registry), agent knowledge management
+  (knowledge-sync, knowledge-curator), and session persistence (memento). This
+  is the single entry point for all AIDA operations - the sub-skills are not
+  directly invocable.
 version: 0.9.0
 tags:
   - core

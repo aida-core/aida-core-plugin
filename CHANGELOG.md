@@ -13,6 +13,43 @@ All notable changes to AIDA Core Plugin.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.35] - 2026-06-13
+
+### Fixed
+
+- **AIDA skills no longer shadow Claude Code's built-in slash
+  commands** — every sub-skill was registered as its own
+  top-level slash command (the `user-invocable` field defaults to
+  `true`), so the skill literally named `permissions` collided
+  with the built-in `/permissions` command and intermittently
+  intercepted it instead of letting the native command fire
+  (reported by Mark via Slack). All 10 sub-skills now set
+  `user-invocable: false`, leaving `/aida` as the single
+  user-facing entry point. The sub-skills remain reachable through
+  `/aida <thing>` routing because `user-invocable: false` only
+  hides a skill from the `/` menu — it does not block Skill-tool
+  invocation by the `aida` router
+- **`plugin-manager` frontmatter** — corrected `argument_hint`
+  (underscore) to the canonical `argument-hint` (hyphen) so the
+  field is actually recognized
+
+### Changed
+
+- **Sub-skill descriptions rewritten for routing precision** —
+  each description now leads with the concrete AIDA-scoped action,
+  anchors invocation to `/aida`, and adds an explicit negative
+  boundary so the model stops auto-routing generic requests into
+  AIDA skills (e.g. the `permissions` description now explicitly
+  defers ad-hoc permission edits and the built-in `/permissions`
+  command to native Claude Code). Applies to `permissions`,
+  `agent-manager`, `skill-manager`, `plugin-manager`,
+  `hook-manager`, `claude-md-manager`, `memento`, and
+  `expert-registry`
+- **`aida` skill description** — now enumerates all routed
+  sub-skills (added `permissions`, `expert-registry`,
+  `knowledge-sync`, `knowledge-curator`) and states that it is the
+  single entry point and the sub-skills are not directly invocable
+
 ## [1.5.34] - 2026-05-28
 
 ### Added
