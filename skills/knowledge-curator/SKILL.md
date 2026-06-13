@@ -9,7 +9,7 @@ description: >-
   in-use or rejected based on the agent's purpose, or walks them
   interactively with a human for override.
 version: 0.1.0
-user-invocable: true
+user-invocable: false
 argument-hint: "[curate <agent>|review <agent>]"
 tags:
   - core

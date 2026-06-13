@@ -3,10 +3,13 @@ type: skill
 name: agent-manager
 title: Agent Manager
 description: >-
-  Manages Claude Code agent (subagent) definitions including
-  create, validate, version, and list operations using a
-  two-phase API.
+  Create, validate, version, and list AIDA-managed Claude Code
+  subagent definition files (two-phase API). Use for CRUD on agent
+  .md definitions, routed through /aida extension management. Do
+  NOT use to run, dispatch, or consult a subagent — this only
+  authors and maintains the definition files.
 version: 0.1.0
+user-invocable: false
 tags:
   - core
   - management

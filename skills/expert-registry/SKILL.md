@@ -2,12 +2,13 @@
 type: skill
 name: expert-registry
 description: >-
-  Manage expert agent activation and panel composition for
-  project and global scopes. Provides list, configure, and
-  panel operations for expert-based workflows like code review
-  and plan grading.
+  Configure AIDA expert-agent activation and panel composition for
+  project and global scopes (list, configure, panel operations),
+  routed through /aida. Use to set which experts/panels are active
+  for workflows like code review and plan grading. Do NOT use to
+  run a review or grading — this only manages the registry.
 version: 0.1.0
-user-invocable: true
+user-invocable: false
 argument-hint: "[list|list configure|panel list|panel create|panel remove]"
 tags:
   - core

@@ -3,10 +3,14 @@ type: skill
 name: plugin-manager
 title: Plugin Manager
 description: >-
-  Unified plugin management combining extension CRUD operations
-  (create, validate, version, list) with project scaffolding
+  Create, validate, version, list, and scaffold AIDA/Claude Code
+  plugin projects (two-phase API). Use for plugin authoring and
+  project scaffolding, routed through /aida extension management.
+  Do NOT use to install or enable a plugin in the user's Claude
+  Code session — this only authors plugin project files.
 version: 0.1.0
-argument_hint: "[operation] [args]"
+user-invocable: false
+argument-hint: "[operation] [args]"
 tags:
   - core
   - management

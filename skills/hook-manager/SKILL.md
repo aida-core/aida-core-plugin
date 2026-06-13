@@ -3,10 +3,13 @@ type: skill
 name: hook-manager
 title: Hook Manager
 description: >-
-  Manages Claude Code hook configurations in
-  settings.json files. Supports listing, adding,
-  removing, and validating lifecycle hooks.
+  List, add, remove, and validate Claude Code lifecycle hook
+  entries in settings.json, routed through /aida extension
+  management. Use for structured CRUD on the hooks block. For
+  general settings.json edits or other harness behavior changes,
+  use the native settings/config flow instead.
 version: 0.1.0
+user-invocable: false
 tags:
   - core
   - hooks

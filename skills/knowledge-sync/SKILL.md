@@ -8,7 +8,7 @@ description: >-
   files. Supports local files and HTTP/HTTPS URLs, plus URL
   discovery via the sitemap-first spider.
 version: 0.3.0
-user-invocable: true
+user-invocable: false
 argument-hint: "[sync <agent>|status <agent>|discover <agent>]"
 tags:
   - core

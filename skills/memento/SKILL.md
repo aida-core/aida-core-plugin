@@ -1,8 +1,13 @@
 ---
 type: skill
 name: memento
-description: Manages mementos for session persistence - save and restore context across /clear and /compact
+description: >-
+  Save and restore AIDA session mementos — structured context
+  snapshots that persist across /clear and /compact. Use when the
+  user runs /aida memento to capture or restore session state. Not
+  a general note-taking tool or long-term memory store.
 version: 0.1.0
+user-invocable: false
 tags:
   - core
   - memory

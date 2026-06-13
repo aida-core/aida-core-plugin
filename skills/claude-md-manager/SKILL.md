@@ -3,10 +3,13 @@ type: skill
 name: claude-md-manager
 title: CLAUDE.md Manager
 description: >-
-  Manages CLAUDE.md configuration files across project, user, and
-  plugin scopes using a two-phase API for create, optimize,
-  validate, and list operations.
+  Create, optimize, validate, and list CLAUDE.md memory files
+  across project, user, and plugin scopes (two-phase API), routed
+  through /aida. Use for structured CLAUDE.md management. Do NOT
+  use for a one-off manual edit to a single CLAUDE.md — edit that
+  file directly.
 version: 0.1.0
+user-invocable: false
 tags:
   - core
   - configuration
