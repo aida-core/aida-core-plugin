@@ -8,7 +8,7 @@
 
 # Testing
 pytest>=8.0
-pytest-cov>=4.0
+pytest-cov>=7.1.0
 responses>=0.24    # HTTP mocking for knowledge-sync HTTP fetcher tests
 
 # Linting
